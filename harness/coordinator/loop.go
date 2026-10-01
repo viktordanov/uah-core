@@ -6,6 +6,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 	"uuid"
@@ -50,6 +51,18 @@ type loopState struct {
 	callModel         bool
 	grace             <-chan time.Time
 	graceToolCalls    map[toolCallKey]struct{}
+	graceYield        time.Duration // the yield the grace period lasts, zero for the default period
+	wake              wakeState
+}
+
+// wakeState is how the WakePolicy holds the next turn back; each turn starts
+// it afresh.
+type wakeState struct {
+	sleepAll  bool // the latest turn issued no calls while calls ran
+	failed    bool // a call failed since the latest turn started
+	released  bool // an inbox input arrived since the latest turn started
+	debounce  <-chan time.Time
+	debounced bool
 }
 
 type toolCallState struct {
@@ -148,7 +161,10 @@ func (current *coordinator) Run(ctx context.Context) error {
 			}
 
 		case <-current.state.grace:
-			current.clearToolGrace()
+			current.expireToolGrace()
+
+		case <-current.state.wake.debounce:
+			current.state.wake.debounce, current.state.wake.debounced = nil, true
 
 		case received := <-modelResponses:
 			if current.cancelModel == nil || received.turnID != current.state.currentTurnID {
@@ -206,7 +222,26 @@ func (current *coordinator) processEvents(ctx context.Context) (bool, error) {
 	if _, err := current.reconcileToolCalls(ctx); err != nil {
 		return false, err
 	}
-	return current.state.callModel || (current.pendingInputs() > 0 && current.cancelModel == nil && len(current.state.graceToolCalls) == 0), nil
+	return current.state.callModel || (current.pendingInputs() > 0 && current.cancelModel == nil && len(current.state.graceToolCalls) == 0 && !current.holdWake()), nil
+}
+
+// holdWake reports whether the wake policy holds pending results back
+// while calls still run.
+func (current *coordinator) holdWake() bool {
+	wake, policy := &current.state.wake, current.dependencies.Wake
+	if wake.released || len(current.state.toolCalls) == 0 {
+		return false
+	}
+	if wake.sleepAll && !wake.failed {
+		return true
+	}
+	if policy.Debounce <= 0 || wake.debounced {
+		return false
+	}
+	if wake.debounce == nil {
+		wake.debounce = time.After(policy.Debounce)
+	}
+	return true
 }
 
 func (current *coordinator) processInputs(ctx context.Context, inputs []inbox.Input) error {
@@ -244,18 +279,90 @@ func (current *coordinator) processModelResponse(ctx context.Context, modelRespo
 			}
 		}
 	}
+	if current.dependencies.Wake.holdsTurn() && current.holdTurn(statuses) {
+		return nil
+	}
 	if !current.state.callModel && len(statuses) > 0 {
 		for _, status := range statuses {
 			current.state.graceToolCalls[toolCallKey{turnID: status.TurnID, callID: status.CallID}] = struct{}{}
 		}
 		current.state.grace = time.After(toolCallRunGracePeriod)
 	}
+	if len(statuses) == 0 && current.dependencies.Wake.AllDone && current.state.currentTurnType != session.TurnCompaction {
+		current.state.wake.sleepAll = len(current.state.toolCalls) != 0
+	}
 	return nil
+}
+
+// holdTurn holds the turn's results until the calls the policy waits for
+// have finished: every running call for Batch, or until the longest yield
+// for the calls that yield. It reports false when no running call is held,
+// which leaves the default grace period.
+func (current *coordinator) holdTurn(statuses []sessionstore.ToolCallStatus) bool {
+	policy := current.dependencies.Wake
+	var longest time.Duration
+	for _, status := range statuses {
+		key := toolCallKey{turnID: status.TurnID, callID: status.CallID}
+		call, running := current.state.toolCalls[key]
+		if !running {
+			continue
+		}
+		if !policy.Batch {
+			yield := policy.Yield(call.toolCall)
+			if yield <= 0 {
+				continue
+			}
+			longest = max(longest, yield)
+		}
+		current.state.graceToolCalls[key] = struct{}{}
+	}
+	if len(current.state.graceToolCalls) == 0 {
+		return false
+	}
+	current.state.callModel = false
+	if !policy.Batch {
+		current.state.grace = time.After(longest)
+		current.state.graceYield = longest
+	}
+	return true
+}
+
+// expireToolGrace ends the grace period. A yield that ends with calls it
+// waits for still running wakes the model with their output so far.
+func (current *coordinator) expireToolGrace() {
+	if current.state.graceYield > 0 {
+		keys := slices.SortedFunc(maps.Keys(current.state.graceToolCalls), func(a, b toolCallKey) int {
+			return cmp.Compare(a.callID, b.callID)
+		})
+		for _, key := range keys {
+			current.addToolProgress(key, current.state.graceYield)
+		}
+		current.state.callModel = current.state.callModel || len(keys) != 0
+	}
+	current.clearToolGrace()
+}
+
+// addToolProgress shows a call that outlived its yield as still running,
+// with its output so far.
+func (current *coordinator) addToolProgress(key toolCallKey, waited time.Duration) {
+	call := current.state.toolCalls[key]
+	text := fmt.Sprintf("Still running after %s. The call continues in the background, and its result arrives in a later turn.", waited)
+	if progress := current.dependencies.Wake.Progress; progress != nil && call.status != nil {
+		operations := make([]operation.Operation, 0, len(call.status.WaitingFor))
+		for _, id := range call.status.WaitingFor {
+			operations = append(operations, current.state.operations[id])
+		}
+		if output := progress(operations); output != "" {
+			text += "\nOutput so far:\n" + output
+		}
+	}
+	current.dependencies.ContextBuilder.AddToolResult(key.callID, []llm.ToolResultOutput{{Kind: llm.ToolResultText, Value: text}}, false)
 }
 
 func (current *coordinator) clearToolGrace() {
 	clear(current.state.graceToolCalls)
 	current.state.grace = nil
+	current.state.graceYield = 0
 }
 
 func (current *coordinator) handleStop() (bool, error) {
@@ -276,7 +383,7 @@ func (current *coordinator) isIdle() bool {
 
 func (current *coordinator) isWaitingForOnlyToolCalls() bool {
 	return current.cancelModel == nil && current.stop.request.Mode != inbox.StopHard &&
-		current.pendingInputs() == 0 && len(current.state.toolCalls) != 0
+		(current.pendingInputs() == 0 || current.state.wake.sleepAll) && len(current.state.toolCalls) != 0
 }
 
 func (current *coordinator) postHeartbeat(ctx context.Context) error {
@@ -371,6 +478,7 @@ func (current *coordinator) requestModelResponse(
 	requestContext, cancel := context.WithCancel(ctx)
 	current.cancelModel = cancel
 	current.state.callModel = false
+	current.state.wake = wakeState{}
 	go func() {
 		response, err := current.dependencies.LLM.Respond(requestContext, built.Request, llm.RequestOptions{
 			CacheKey: string(current.dependencies.SessionID),
@@ -411,6 +519,7 @@ func (current *coordinator) handleInboxInput(ctx context.Context, input inbox.In
 		}
 	}
 	current.clearToolGrace()
+	current.state.wake.released = true
 	return nil
 }
 
@@ -721,6 +830,7 @@ func (current *coordinator) addToolResultToLocalState(
 	if !exists {
 		if !toolCallRequiresTranslator(status) {
 			current.dependencies.ContextBuilder.AddToolResult(status.CallID, []llm.ToolResultOutput{{Kind: llm.ToolResultText, Value: status.Status.Error}}, false)
+			current.state.wake.failed = true
 			current.finishToolCall(status.TurnID, status.CallID)
 		}
 		return nil
@@ -748,9 +858,31 @@ func (current *coordinator) addToolResultToLocalState(
 		running,
 	)
 	if !running {
+		current.state.wake.failed = current.state.wake.failed || toolCallFailed(status.Status, operations)
 		current.finishToolCall(status.TurnID, status.CallID)
 	}
 	return nil
+}
+
+// toolCallFailed reports whether a finished call failed: an error, an
+// operation that failed or was canceled, or a command that exited nonzero.
+func toolCallFailed(status tool.CallStatus, operations []operation.Operation) bool {
+	if status.Error != "" {
+		return true
+	}
+	for _, value := range operations {
+		switch value.Status {
+		case operation.StatusFailed, operation.StatusCanceled:
+			return true
+		}
+		if value.Type != operation.TypeShell {
+			continue
+		}
+		if state, err := operation.DecodeShellState(value); err == nil && state.Result != nil && state.Result.ExitCode != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (current *coordinator) addOperationToLocalState(

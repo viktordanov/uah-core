@@ -457,6 +457,20 @@ func (shell *Shell) finish(paths shellPaths) (Step, error) {
 	return shell.checkpoint()
 }
 
+// ShellCapturePaths returns the files a shell operation captures its stdout
+// and stderr in, which hold its output so far while it runs.
+func ShellCapturePaths(current Operation) (string, string, error) {
+	state, err := DecodeShellState(current)
+	if err != nil {
+		return "", "", err
+	}
+	paths, err := newShellPaths(state.BaseDirectory, current.ID)
+	if err != nil {
+		return "", "", err
+	}
+	return paths.out, paths.err, nil
+}
+
 type shellPaths struct {
 	directory string
 	out       string
