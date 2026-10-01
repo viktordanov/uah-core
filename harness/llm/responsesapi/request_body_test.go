@@ -101,6 +101,36 @@ func TestRequestBodyMatchesLegacyEncoding(t *testing.T) {
 	}
 }
 
+func TestRequestBodyFitsItsBuffer(t *testing.T) {
+	request := benchmarkRequest(50)
+	for index := range 40 {
+		request.Tools = append(request.Tools, llm.Tool{
+			Type:        llm.ToolFunction,
+			Name:        fmt.Sprintf("tool_%d", index),
+			Description: strings.Repeat("Describes the tool at length. ", 100),
+			Parameters:  map[string]any{"type": "object"},
+		})
+	}
+	extensions := map[string]jsontext.Value{"provider": jsontext.Value(`{"sort":"throughput"}`)}
+	for _, current := range []map[string]jsontext.Value{nil, extensions} {
+		input, err := requestInput(request.Input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tools, err := requestTools(request.Tools)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := requestBody(request, "cache-key", current)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := requestBuffer(input, tools).Cap(); cap(body) != want {
+			t.Fatalf("body capacity = %d, want the buffer's %d: the buffer grew", cap(body), want)
+		}
+	}
+}
+
 func TestInputCacheMatchesLegacyEncoding(t *testing.T) {
 	history := benchmarkRequest(6).Input
 	edited := slices.Clone(history)

@@ -66,14 +66,14 @@ func encodeRequestBody(
 		params.Tools = &tools
 	}
 	if len(extensions) != 0 {
-		return extendRequestBody(params, input, extensions)
+		return extendRequestBody(params, input, tools, extensions)
 	}
 	if len(input) != 0 {
 		// The placeholder is encoded from the items directly, so the history
 		// is not copied into an intermediate union value first.
 		params.Input = &openaiapi.InputParam{}
 	}
-	body := input.buffer()
+	body := requestBuffer(input, tools)
 	if err := json.MarshalWrite(body, params, json.Deterministic(true), json.WithMarshalers(
 		json.MarshalToFunc(func(encoder *jsontext.Encoder, _ openaiapi.InputParam) error {
 			return input.MarshalJSONTo(encoder)
@@ -84,7 +84,12 @@ func encodeRequestBody(
 	return body.Bytes(), nil
 }
 
-func extendRequestBody(params openaiapi.CreateResponse, input requestInputItems, extensions map[string]jsontext.Value) ([]byte, error) {
+func extendRequestBody(
+	params openaiapi.CreateResponse,
+	input requestInputItems,
+	tools openaiapi.ToolsArray,
+	extensions map[string]jsontext.Value,
+) ([]byte, error) {
 	body, err := json.Marshal(params, json.Deterministic(true))
 	if err != nil {
 		return nil, fmt.Errorf("encode response request: %w", err)
@@ -109,7 +114,7 @@ func extendRequestBody(params openaiapi.CreateResponse, input requestInputItems,
 		}
 		fields[name] = value
 	}
-	extended := input.buffer()
+	extended := requestBuffer(input, tools)
 	if err := json.MarshalWrite(extended, fields, json.Deterministic(true)); err != nil {
 		return nil, fmt.Errorf("encode response request: %w", err)
 	}
@@ -132,13 +137,17 @@ func (items requestInputItems) MarshalJSONTo(encoder *jsontext.Encoder) error {
 	return encoder.WriteToken(jsontext.EndArray)
 }
 
-// buffer returns an empty buffer that holds the encoded items and the
-// request's other fields without growing, since a large history would
-// otherwise be copied each time the buffer grows.
-func (items requestInputItems) buffer() *bytes.Buffer {
+// requestBuffer returns an empty buffer that holds the request without
+// growing, since a large history would otherwise be copied each time the
+// buffer grows.
+func requestBuffer(input requestInputItems, tools openaiapi.ToolsArray) *bytes.Buffer {
 	size := 4 << 10
-	for _, item := range items {
+	for _, item := range input {
 		size += len(item) + len(",")
+	}
+	for _, tool := range tools {
+		encoded, _ := tool.MarshalJSON()
+		size += len(encoded) + len(",")
 	}
 	// An encoder writing to a bytes.Buffer grows it whenever less than a
 	// quarter of the written length remains available.
