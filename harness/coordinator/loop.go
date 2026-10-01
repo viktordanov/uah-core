@@ -51,7 +51,6 @@ type loopState struct {
 	callModel         bool
 	grace             <-chan time.Time
 	graceToolCalls    map[toolCallKey]struct{}
-	graceRelease      bool // the grace timer is the WakePolicy's ReleaseQuick
 	// valves are the WakePolicy's Hold deadlines of the running calls; valve
 	// fires at the earliest.
 	valves map[toolCallKey]time.Time
@@ -155,7 +154,7 @@ func (current *coordinator) Run(ctx context.Context) error {
 			}
 
 		case <-current.state.grace:
-			current.expireToolGrace()
+			current.clearToolGrace()
 
 		case <-current.state.valve:
 			current.openValves()
@@ -285,21 +284,7 @@ func (current *coordinator) holdTurn(statuses []sessionstore.ToolCallStatus) boo
 		return false
 	}
 	current.state.callModel = false
-	if policy.ReleaseQuick > 0 {
-		current.state.grace = time.After(policy.ReleaseQuick)
-		current.state.graceRelease = true
-	}
 	return true
-}
-
-// expireToolGrace ends the grace period. ReleaseQuick ends it only when
-// results are waiting; otherwise the turn stays held.
-func (current *coordinator) expireToolGrace() {
-	if current.state.graceRelease && current.pendingInputs() == 0 {
-		current.state.grace, current.state.graceRelease = nil, false
-		return
-	}
-	current.clearToolGrace()
 }
 
 // openValves wakes the model for each call still running past its Hold
@@ -373,7 +358,6 @@ func durationText(d time.Duration) string {
 func (current *coordinator) clearToolGrace() {
 	clear(current.state.graceToolCalls)
 	current.state.grace = nil
-	current.state.graceRelease = false
 }
 
 func (current *coordinator) handleStop() (bool, error) {

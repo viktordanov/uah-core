@@ -39,10 +39,6 @@ type WakePolicy struct {
 	// after Hold, from any turn, wakes the model with its output so far and
 	// stops holding the turn back.
 	Hold time.Duration
-	// ReleaseQuick, when set with Hold, releases the results held this long
-	// after the turn while its other calls still run, so the model can work
-	// beside them; those calls then wake it when they finish or after Hold.
-	ReleaseQuick time.Duration
 	// Progress renders the output so far of a call that outlived Hold; nil
 	// or an empty result shows no output.
 	Progress func([]operation.Operation) string
