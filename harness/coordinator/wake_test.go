@@ -1,7 +1,6 @@
 package coordinator
 
 import (
-	"encoding/json/v2"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -12,9 +11,11 @@ import (
 	"github.com/viktordanov/unreal-agent/harness/tool"
 )
 
-func TestCoordinatorBatchWaitsForEveryCallOfTheTurn(t *testing.T) {
+const stillRunningFiveMinutes = "Still running after 5 minutes. The call continues in the background, and its result arrives in a later turn.\nOutput so far:\npartial"
+
+func TestCoordinatorHoldWaitsForEveryCallOfTheTurn(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{Batch: true})
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 0))
 		run.respond(t, 0, toolGraceResponse("A", "B"))
 		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
 		synctest.Sleep(time.Minute)
@@ -27,12 +28,16 @@ func TestCoordinatorBatchWaitsForEveryCallOfTheTurn(t *testing.T) {
 		}
 		assertStopResult(t, run.calls[1].request, "A", string(operation.StatusCompleted))
 		assertStopResult(t, run.calls[1].request, "B", string(operation.StatusCompleted))
+		synctest.Sleep(10 * time.Minute)
+		if run.requestCount() != 2 {
+			t.Fatal("the hold's valve opened for a call that had finished")
+		}
 	})
 }
 
-func TestCoordinatorBatchHoldsImmediateResults(t *testing.T) {
+func TestCoordinatorHoldKeepsImmediateResults(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{Batch: true})
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 0))
 		response := toolGraceResponse("A")
 		response.Output = append(response.Output, llm.Item{Type: llm.ItemToolCall, Data: llm.ToolCall{
 			CallID: "immediate", Name: tool.ViewImageName, Arguments: `{}`,
@@ -50,215 +55,139 @@ func TestCoordinatorBatchHoldsImmediateResults(t *testing.T) {
 	})
 }
 
-func TestCoordinatorBatchEndsOnInboxInput(t *testing.T) {
+func TestCoordinatorHoldEndsOnInboxInput(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{Batch: true})
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 0))
 		run.respond(t, 0, toolGraceResponse("A", "B"))
 		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
 		run.input(t, heartbeatInput(t, "heartbeat"))
 		if run.requestCount() != 2 {
-			t.Fatal("a heartbeat did not end the batch")
+			t.Fatal("a heartbeat did not end the hold")
 		}
 		assertStopResult(t, run.calls[1].request, "B", contextbuilder.ToolCallRunningPayload)
 	})
 }
 
-func TestCoordinatorDebounceGathersResultsThatLandTogether(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{Debounce: 2 * time.Second})
-		run.respond(t, 0, toolGraceResponse("A", "B", "C"))
-		synctest.Sleep(toolCallRunGracePeriod)
-		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
-		deadline := time.Now().Add(2 * time.Second)
-		synctest.Sleep(time.Second)
-		updateToolGraceCall(t, run, "B", operation.StatusCompleted)
-		synctest.Sleep(time.Until(deadline) - 10*slurpIdleTimeout)
-		if run.requestCount() != 1 {
-			t.Fatal("a result woke the model before the debounce window ended")
-		}
-		synctest.Sleep(20 * slurpIdleTimeout)
-		if run.requestCount() != 2 {
-			t.Fatal("the debounce window did not wake the model")
-		}
-		assertStopResult(t, run.calls[1].request, "A", string(operation.StatusCompleted))
-		assertStopResult(t, run.calls[1].request, "B", string(operation.StatusCompleted))
-		assertStopResult(t, run.calls[1].request, "C", contextbuilder.ToolCallRunningPayload)
-		run.respond(t, 1, textResponse("Waiting for C."))
-		updateToolGraceCall(t, run, "C", operation.StatusCompleted)
-		if run.requestCount() != 3 {
-			t.Fatal("the last running call's result was debounced")
-		}
-	})
-}
-
-func TestCoordinatorDebounceEndsWhenNothingRuns(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{Debounce: 2 * time.Second})
-		run.respond(t, 0, toolGraceResponse("A", "B"))
-		synctest.Sleep(toolCallRunGracePeriod)
-		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
-		synctest.Sleep(500 * time.Millisecond)
-		updateToolGraceCall(t, run, "B", operation.StatusCompleted)
-		if run.requestCount() != 2 {
-			t.Fatal("the debounce held results after every call finished")
-		}
-		assertStopResult(t, run.calls[1].request, "A", string(operation.StatusCompleted))
-		assertStopResult(t, run.calls[1].request, "B", string(operation.StatusCompleted))
-		synctest.Sleep(time.Minute)
-		if run.requestCount() != 2 {
-			t.Fatal("a stale debounce window woke the model")
-		}
-	})
-}
-
-func TestCoordinatorAllDoneSleepsUntilEveryCallFinishes(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{AllDone: true})
-		run.respond(t, 0, toolGraceResponse("A", "B", "C"))
-		synctest.Sleep(toolCallRunGracePeriod)
-		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
-		if run.requestCount() != 2 {
-			t.Fatal("a result did not wake the model while it had calls to make")
-		}
-		run.respond(t, 1, textResponse("Waiting for B and C."))
-		updateToolGraceCall(t, run, "B", operation.StatusCompleted)
-		synctest.Sleep(time.Minute)
-		if run.requestCount() != 2 {
-			t.Fatal("a result woke the model before every call finished")
-		}
-		updateToolGraceCall(t, run, "C", operation.StatusCompleted)
-		if run.requestCount() != 3 {
-			t.Fatal("the last result did not wake the model")
-		}
-		assertStopResult(t, run.calls[2].request, "B", string(operation.StatusCompleted))
-		assertStopResult(t, run.calls[2].request, "C", string(operation.StatusCompleted))
-	})
-}
-
-func TestCoordinatorAllDoneWakesOnFailureOrInput(t *testing.T) {
-	for _, wake := range []string{"failed", "canceled", "steering", "heartbeat"} {
-		t.Run(wake, func(t *testing.T) {
+func TestCoordinatorHoldValveWakesWithOutputSoFar(t *testing.T) {
+	for _, hold := range []time.Duration{5 * time.Minute, time.Minute} {
+		t.Run(hold.String(), func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				run := newWakeTestRun(t, WakePolicy{AllDone: true})
+				run := newWakeTestRun(t, holdPolicy(hold, 0))
 				run.respond(t, 0, toolGraceResponse("A", "B"))
-				synctest.Sleep(toolCallRunGracePeriod)
-				run.input(t, externalEvent(t, 1, "check", "check in"))
-				run.respond(t, 1, textResponse("Waiting."))
-				switch wake {
-				case "failed":
-					updateToolGraceCall(t, run, "A", operation.StatusFailed)
-				case "canceled":
-					updateToolGraceCall(t, run, "A", operation.StatusCanceled)
-				case "steering":
-					run.input(t, externalEvent(t, 2, "steering", "status?"))
-				case "heartbeat":
-					run.input(t, heartbeatInput(t, "heartbeat"))
+				updateToolGraceCall(t, run, "A", operation.StatusCompleted)
+				synctest.Sleep(hold - 10*slurpIdleTimeout)
+				if run.requestCount() != 1 {
+					t.Fatal("the model woke before the valve opened")
 				}
+				synctest.Sleep(20 * slurpIdleTimeout)
+				if run.requestCount() != 2 {
+					t.Fatal("the valve did not wake the model")
+				}
+				assertStopResult(t, run.calls[1].request, "A", string(operation.StatusCompleted))
+				assertStopResult(t, run.calls[1].request, "B", "Still running after "+durationText(hold)+". The call continues in the background, and its result arrives in a later turn.\nOutput so far:\npartial")
+				run.respond(t, 1, textResponse("Waiting for B."))
+				updateToolGraceCall(t, run, "B", operation.StatusCompleted)
 				if run.requestCount() != 3 {
-					t.Fatalf("%s did not wake a model sleeping until all calls finish", wake)
+					t.Fatal("the call's result did not wake the model after the valve opened")
 				}
-				assertStopResult(t, run.calls[2].request, "B", contextbuilder.ToolCallRunningPayload)
+				assertStopResult(t, run.calls[2].request, "B", string(operation.StatusCompleted))
 			})
 		})
 	}
 }
 
-func TestCoordinatorAllDoneAppliesOnlyToTurnsWithoutCalls(t *testing.T) {
+func TestCoordinatorHoldValveFreesLaterTurns(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, WakePolicy{AllDone: true})
-		run.respond(t, 0, toolGraceResponse("A", "B"))
-		synctest.Sleep(toolCallRunGracePeriod)
-		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 0))
+		run.respond(t, 0, toolGraceResponse("A"))
+		synctest.Sleep(5*time.Minute + 10*slurpIdleTimeout)
+		if run.requestCount() != 2 {
+			t.Fatal("the valve did not wake the model")
+		}
+		assertStopResult(t, run.calls[1].request, "A", stillRunningFiveMinutes)
 		run.respond(t, 1, toolGraceResponse("C"))
-		synctest.Sleep(toolCallRunGracePeriod)
 		updateToolGraceCall(t, run, "C", operation.StatusCompleted)
 		if run.requestCount() != 3 {
-			t.Fatal("a turn that issued calls slept until every call finished")
+			t.Fatal("a call past its valve held a later turn")
+		}
+		run.respond(t, 2, textResponse("Waiting for A."))
+		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
+		if run.requestCount() != 4 {
+			t.Fatal("a call past its valve did not wake the model when it finished")
 		}
 	})
 }
 
-func TestToolCallFailedSeesNonzeroExitCodes(t *testing.T) {
-	exited := func(code int) operation.Operation {
-		state, err := json.Marshal(operation.ShellState{Result: &operation.ShellResult{ExitCode: code}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return operation.Operation{
-			Type: operation.TypeShell, Version: operation.VersionShell, MaxOutputLength: operation.DefaultMaxOutputLength,
-			Status: operation.StatusCompleted, State: state,
-		}
-	}
-	tests := []struct {
-		name       string
-		status     tool.CallStatus
-		operations []operation.Operation
-		want       bool
-	}{
-		{name: "success", operations: []operation.Operation{exited(0)}},
-		{name: "nonzero exit", operations: []operation.Operation{exited(1)}, want: true},
-		{name: "failed operation", operations: []operation.Operation{{Status: operation.StatusFailed}}, want: true},
-		{name: "error", status: tool.ErrorStatus("bad arguments", 0), want: true},
-	}
-	for _, test := range tests {
-		if got := toolCallFailed(test.status, test.operations); got != test.want {
-			t.Errorf("%s: failed = %v, want %v", test.name, got, test.want)
-		}
-	}
-}
-
-func TestCoordinatorYieldWaitsForForegroundCalls(t *testing.T) {
+func TestCoordinatorReleaseQuickLetsTheModelWorkBesideLongCalls(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, yieldPolicy())
-		run.respond(t, 0, toolGraceResponse("A", "background"))
-		updateToolGraceCall(t, run, "background", operation.StatusCompleted)
-		synctest.Sleep(20 * time.Second)
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 10*time.Second))
+		run.respond(t, 0, toolGraceResponse("quick", "long"))
+		updateToolGraceCall(t, run, "quick", operation.StatusCompleted)
+		synctest.Sleep(10*time.Second - 10*slurpIdleTimeout)
 		if run.requestCount() != 1 {
-			t.Fatal("a result woke the model while a foreground call ran")
+			t.Fatal("quick results were released early")
 		}
-		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
+		synctest.Sleep(20 * slurpIdleTimeout)
 		if run.requestCount() != 2 {
-			t.Fatal("the foreground call's result did not wake the model")
+			t.Fatal("quick results were not released")
 		}
-		assertStopResult(t, run.calls[1].request, "A", string(operation.StatusCompleted))
-		assertStopResult(t, run.calls[1].request, "background", string(operation.StatusCompleted))
-	})
-}
-
-func TestCoordinatorYieldWakesWithOutputSoFar(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, yieldPolicy())
-		run.respond(t, 0, toolGraceResponse("A", "background"))
-		synctest.Sleep(30*time.Second - time.Millisecond)
-		if run.requestCount() != 1 {
-			t.Fatal("the model woke before the yield ended")
-		}
-		synctest.Sleep(time.Millisecond)
+		assertStopResult(t, run.calls[1].request, "quick", string(operation.StatusCompleted))
+		assertStopResult(t, run.calls[1].request, "long", contextbuilder.ToolCallRunningPayload)
+		run.respond(t, 1, textResponse("Waiting for long."))
+		synctest.Sleep(time.Minute)
 		if run.requestCount() != 2 {
-			t.Fatal("the end of the yield did not wake the model")
+			t.Fatal("the model woke while the long call ran")
 		}
-		assertStopResult(t, run.calls[1].request, "A", "Still running after 30s. The call continues in the background, and its result arrives in a later turn.\nOutput so far:\npartial")
-		assertStopResult(t, run.calls[1].request, "background", contextbuilder.ToolCallRunningPayload)
-		run.respond(t, 1, textResponse("Waiting."))
-		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
+		updateToolGraceCall(t, run, "long", operation.StatusCompleted)
 		if run.requestCount() != 3 {
-			t.Fatal("a yielded call's result did not wake the model")
+			t.Fatal("the long call's result did not wake the model")
 		}
-		assertStopResult(t, run.calls[2].request, "A", string(operation.StatusCompleted))
 	})
 }
 
-func TestCoordinatorYieldKeepsGraceForBackgroundCalls(t *testing.T) {
+func TestCoordinatorReleaseQuickHoldsWithoutQuickResults(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, yieldPolicy())
-		run.respond(t, 0, toolGraceResponse("background", "background-2"))
-		updateToolGraceCall(t, run, "background", operation.StatusCompleted)
-		synctest.Sleep(toolCallRunGracePeriod)
-		if run.requestCount() != 2 {
-			t.Fatal("background calls did not keep the default grace period")
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 10*time.Second))
+		run.respond(t, 0, toolGraceResponse("A", "B"))
+		synctest.Sleep(20 * time.Second)
+		updateToolGraceCall(t, run, "A", operation.StatusCompleted)
+		synctest.Sleep(time.Minute)
+		if run.requestCount() != 1 {
+			t.Fatal("a slow result was released while the turn's other call ran")
 		}
-		assertStopResult(t, run.calls[1].request, "background-2", contextbuilder.ToolCallRunningPayload)
+		updateToolGraceCall(t, run, "B", operation.StatusCompleted)
+		if run.requestCount() != 2 {
+			t.Fatal("the turn's last result did not wake the model")
+		}
 	})
+}
+
+func TestCoordinatorReleaseQuickKeepsTheValve(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		run := newWakeTestRun(t, holdPolicy(5*time.Minute, 10*time.Second))
+		run.respond(t, 0, toolGraceResponse("quick", "long"))
+		updateToolGraceCall(t, run, "quick", operation.StatusCompleted)
+		synctest.Sleep(10*time.Second + 10*slurpIdleTimeout)
+		run.respond(t, 1, textResponse("Waiting for long."))
+		synctest.Sleep(5 * time.Minute)
+		if run.requestCount() != 3 {
+			t.Fatal("the valve did not wake the model for the long call")
+		}
+		assertStopResult(t, run.calls[2].request, "long", stillRunningFiveMinutes)
+	})
+}
+
+func TestDurationText(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		5 * time.Minute:  "5 minutes",
+		time.Minute:      "1 minute",
+		90 * time.Second: "90 seconds",
+		time.Second:      "1 second",
+	} {
+		if got := durationText(d); got != want {
+			t.Errorf("durationText(%s) = %q, want %q", d, got, want)
+		}
+	}
 }
 
 func newWakeTestRun(t *testing.T, policy WakePolicy) *stopTestRun {
@@ -270,15 +199,12 @@ func newWakeTestRun(t *testing.T, policy WakePolicy) *stopTestRun {
 	return run
 }
 
-// yieldPolicy waits 30 seconds for each call but those named background.
-func yieldPolicy() WakePolicy {
+// holdPolicy holds for hold and releases quick results after release, with a
+// progress of "partial" for each call.
+func holdPolicy(hold, release time.Duration) WakePolicy {
 	return WakePolicy{
-		Yield: func(call llm.ToolCall) time.Duration {
-			if call.CallID == "background" || call.CallID == "background-2" {
-				return 0
-			}
-			return 30 * time.Second
-		},
+		Hold:         hold,
+		ReleaseQuick: release,
 		Progress: func(operations []operation.Operation) string {
 			if len(operations) != 1 {
 				return ""

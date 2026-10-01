@@ -51,18 +51,11 @@ type loopState struct {
 	callModel         bool
 	grace             <-chan time.Time
 	graceToolCalls    map[toolCallKey]struct{}
-	graceYield        time.Duration // the yield the grace period lasts, zero for the default period
-	wake              wakeState
-}
-
-// wakeState is how the WakePolicy holds the next turn back; each turn starts
-// it afresh.
-type wakeState struct {
-	sleepAll  bool // the latest turn issued no calls while calls ran
-	failed    bool // a call failed since the latest turn started
-	released  bool // an inbox input arrived since the latest turn started
-	debounce  <-chan time.Time
-	debounced bool
+	graceRelease      bool // the grace timer is the WakePolicy's ReleaseQuick
+	// valves are the WakePolicy's Hold deadlines of the running calls; valve
+	// fires at the earliest.
+	valves map[toolCallKey]time.Time
+	valve  <-chan time.Time
 }
 
 type toolCallState struct {
@@ -93,6 +86,7 @@ func newLoopState() loopState {
 		toolCalls:      make(map[toolCallKey]toolCallState),
 		operations:     make(map[operation.ID]operation.Operation),
 		graceToolCalls: make(map[toolCallKey]struct{}),
+		valves:         make(map[toolCallKey]time.Time),
 	}
 }
 
@@ -163,8 +157,8 @@ func (current *coordinator) Run(ctx context.Context) error {
 		case <-current.state.grace:
 			current.expireToolGrace()
 
-		case <-current.state.wake.debounce:
-			current.state.wake.debounce, current.state.wake.debounced = nil, true
+		case <-current.state.valve:
+			current.openValves()
 
 		case received := <-modelResponses:
 			if current.cancelModel == nil || received.turnID != current.state.currentTurnID {
@@ -222,26 +216,7 @@ func (current *coordinator) processEvents(ctx context.Context) (bool, error) {
 	if _, err := current.reconcileToolCalls(ctx); err != nil {
 		return false, err
 	}
-	return current.state.callModel || (current.pendingInputs() > 0 && current.cancelModel == nil && len(current.state.graceToolCalls) == 0 && !current.holdWake()), nil
-}
-
-// holdWake reports whether the wake policy holds pending results back
-// while calls still run.
-func (current *coordinator) holdWake() bool {
-	wake, policy := &current.state.wake, current.dependencies.Wake
-	if wake.released || len(current.state.toolCalls) == 0 {
-		return false
-	}
-	if wake.sleepAll && !wake.failed {
-		return true
-	}
-	if policy.Debounce <= 0 || wake.debounced {
-		return false
-	}
-	if wake.debounce == nil {
-		wake.debounce = time.After(policy.Debounce)
-	}
-	return true
+	return current.state.callModel || (current.pendingInputs() > 0 && current.cancelModel == nil && len(current.state.graceToolCalls) == 0), nil
 }
 
 func (current *coordinator) processInputs(ctx context.Context, inputs []inbox.Input) error {
@@ -279,7 +254,7 @@ func (current *coordinator) processModelResponse(ctx context.Context, modelRespo
 			}
 		}
 	}
-	if current.dependencies.Wake.holdsTurn() && current.holdTurn(statuses) {
+	if current.dependencies.Wake.Hold > 0 && current.holdTurn(statuses) {
 		return nil
 	}
 	if !current.state.callModel && len(statuses) > 0 {
@@ -288,65 +263,89 @@ func (current *coordinator) processModelResponse(ctx context.Context, modelRespo
 		}
 		current.state.grace = time.After(toolCallRunGracePeriod)
 	}
-	if len(statuses) == 0 && current.dependencies.Wake.AllDone && current.state.currentTurnType != session.TurnCompaction {
-		current.state.wake.sleepAll = len(current.state.toolCalls) != 0
-	}
 	return nil
 }
 
-// holdTurn holds the turn's results until the calls the policy waits for
-// have finished: every running call for Batch, or until the longest yield
-// for the calls that yield. It reports false when no running call is held,
-// which leaves the default grace period.
+// holdTurn holds the turn's results until every call it issued and that
+// still runs has finished, and gives each such call its Hold deadline. It
+// reports false when no call runs, which leaves the default.
 func (current *coordinator) holdTurn(statuses []sessionstore.ToolCallStatus) bool {
 	policy := current.dependencies.Wake
-	var longest time.Duration
+	deadline := time.Now().Add(policy.Hold)
 	for _, status := range statuses {
 		key := toolCallKey{turnID: status.TurnID, callID: status.CallID}
-		call, running := current.state.toolCalls[key]
-		if !running {
+		if _, running := current.state.toolCalls[key]; !running {
 			continue
 		}
-		if !policy.Batch {
-			yield := policy.Yield(call.toolCall)
-			if yield <= 0 {
-				continue
-			}
-			longest = max(longest, yield)
-		}
 		current.state.graceToolCalls[key] = struct{}{}
+		current.state.valves[key] = deadline
 	}
+	current.armValve()
 	if len(current.state.graceToolCalls) == 0 {
 		return false
 	}
 	current.state.callModel = false
-	if !policy.Batch {
-		current.state.grace = time.After(longest)
-		current.state.graceYield = longest
+	if policy.ReleaseQuick > 0 {
+		current.state.grace = time.After(policy.ReleaseQuick)
+		current.state.graceRelease = true
 	}
 	return true
 }
 
-// expireToolGrace ends the grace period. A yield that ends with calls it
-// waits for still running wakes the model with their output so far.
+// expireToolGrace ends the grace period. ReleaseQuick ends it only when
+// results are waiting; otherwise the turn stays held.
 func (current *coordinator) expireToolGrace() {
-	if current.state.graceYield > 0 {
-		keys := slices.SortedFunc(maps.Keys(current.state.graceToolCalls), func(a, b toolCallKey) int {
-			return cmp.Compare(a.callID, b.callID)
-		})
-		for _, key := range keys {
-			current.addToolProgress(key, current.state.graceYield)
-		}
-		current.state.callModel = current.state.callModel || len(keys) != 0
+	if current.state.graceRelease && current.pendingInputs() == 0 {
+		current.state.grace, current.state.graceRelease = nil, false
+		return
 	}
 	current.clearToolGrace()
 }
 
-// addToolProgress shows a call that outlived its yield as still running,
-// with its output so far.
+// openValves wakes the model for each call still running past its Hold
+// deadline, with its output so far, and stops holding the turn for it.
+func (current *coordinator) openValves() {
+	now := time.Now()
+	keys := slices.SortedFunc(maps.Keys(current.state.valves), func(a, b toolCallKey) int {
+		return cmp.Compare(a.callID, b.callID)
+	})
+	for _, key := range keys {
+		if current.state.valves[key].After(now) {
+			continue
+		}
+		delete(current.state.valves, key)
+		if _, running := current.state.toolCalls[key]; !running {
+			continue
+		}
+		current.addToolProgress(key, current.dependencies.Wake.Hold)
+		current.state.availableInputs++
+		delete(current.state.graceToolCalls, key)
+		if len(current.state.graceToolCalls) == 0 {
+			current.clearToolGrace()
+		}
+	}
+	current.armValve()
+}
+
+// armValve sets the valve timer to the earliest Hold deadline.
+func (current *coordinator) armValve() {
+	current.state.valve = nil
+	var earliest time.Time
+	for _, deadline := range current.state.valves {
+		if earliest.IsZero() || deadline.Before(earliest) {
+			earliest = deadline
+		}
+	}
+	if !earliest.IsZero() {
+		current.state.valve = time.After(time.Until(earliest))
+	}
+}
+
+// addToolProgress shows a call that outlived its Hold as still running, with
+// its output so far.
 func (current *coordinator) addToolProgress(key toolCallKey, waited time.Duration) {
 	call := current.state.toolCalls[key]
-	text := fmt.Sprintf("Still running after %s. The call continues in the background, and its result arrives in a later turn.", waited)
+	text := fmt.Sprintf("Still running after %s. The call continues in the background, and its result arrives in a later turn.", durationText(waited))
 	if progress := current.dependencies.Wake.Progress; progress != nil && call.status != nil {
 		operations := make([]operation.Operation, 0, len(call.status.WaitingFor))
 		for _, id := range call.status.WaitingFor {
@@ -359,10 +358,22 @@ func (current *coordinator) addToolProgress(key toolCallKey, waited time.Duratio
 	current.dependencies.ContextBuilder.AddToolResult(key.callID, []llm.ToolResultOutput{{Kind: llm.ToolResultText, Value: text}}, false)
 }
 
+// durationText is a duration in words, such as "5 minutes" or "90 seconds".
+func durationText(d time.Duration) string {
+	unit, size := "second", time.Second
+	if d%time.Minute == 0 {
+		unit, size = "minute", time.Minute
+	}
+	if n := d / size; n != 1 {
+		return fmt.Sprintf("%d %ss", n, unit)
+	}
+	return "1 " + unit
+}
+
 func (current *coordinator) clearToolGrace() {
 	clear(current.state.graceToolCalls)
 	current.state.grace = nil
-	current.state.graceYield = 0
+	current.state.graceRelease = false
 }
 
 func (current *coordinator) handleStop() (bool, error) {
@@ -383,7 +394,7 @@ func (current *coordinator) isIdle() bool {
 
 func (current *coordinator) isWaitingForOnlyToolCalls() bool {
 	return current.cancelModel == nil && current.stop.request.Mode != inbox.StopHard &&
-		(current.pendingInputs() == 0 || current.state.wake.sleepAll) && len(current.state.toolCalls) != 0
+		current.pendingInputs() == 0 && len(current.state.toolCalls) != 0
 }
 
 func (current *coordinator) postHeartbeat(ctx context.Context) error {
@@ -478,7 +489,6 @@ func (current *coordinator) requestModelResponse(
 	requestContext, cancel := context.WithCancel(ctx)
 	current.cancelModel = cancel
 	current.state.callModel = false
-	current.state.wake = wakeState{}
 	go func() {
 		response, err := current.dependencies.LLM.Respond(requestContext, built.Request, llm.RequestOptions{
 			CacheKey: string(current.dependencies.SessionID),
@@ -519,7 +529,6 @@ func (current *coordinator) handleInboxInput(ctx context.Context, input inbox.In
 		}
 	}
 	current.clearToolGrace()
-	current.state.wake.released = true
 	return nil
 }
 
@@ -661,6 +670,7 @@ func (current *coordinator) addItemToLocalState(
 		// FIXME: Forks leave inherited calls without results and retain pending-input accounting.
 		clear(current.state.toolCalls)
 		clear(current.state.operations)
+		clear(current.state.valves)
 		current.clearToolGrace()
 
 	case sessionstore.ItemInput:
@@ -792,6 +802,7 @@ func (current *coordinator) finishToolCall(
 ) {
 	key := toolCallKey{turnID: turnID, callID: callID}
 	delete(current.state.toolCalls, key)
+	delete(current.state.valves, key)
 	delete(current.state.graceToolCalls, key)
 	if len(current.state.graceToolCalls) == 0 {
 		current.clearToolGrace()
@@ -830,7 +841,6 @@ func (current *coordinator) addToolResultToLocalState(
 	if !exists {
 		if !toolCallRequiresTranslator(status) {
 			current.dependencies.ContextBuilder.AddToolResult(status.CallID, []llm.ToolResultOutput{{Kind: llm.ToolResultText, Value: status.Status.Error}}, false)
-			current.state.wake.failed = true
 			current.finishToolCall(status.TurnID, status.CallID)
 		}
 		return nil
@@ -858,31 +868,9 @@ func (current *coordinator) addToolResultToLocalState(
 		running,
 	)
 	if !running {
-		current.state.wake.failed = current.state.wake.failed || toolCallFailed(status.Status, operations)
 		current.finishToolCall(status.TurnID, status.CallID)
 	}
 	return nil
-}
-
-// toolCallFailed reports whether a finished call failed: an error, an
-// operation that failed or was canceled, or a command that exited nonzero.
-func toolCallFailed(status tool.CallStatus, operations []operation.Operation) bool {
-	if status.Error != "" {
-		return true
-	}
-	for _, value := range operations {
-		switch value.Status {
-		case operation.StatusFailed, operation.StatusCanceled:
-			return true
-		}
-		if value.Type != operation.TypeShell {
-			continue
-		}
-		if state, err := operation.DecodeShellState(value); err == nil && state.Result != nil && state.Result.ExitCode != 0 {
-			return true
-		}
-	}
-	return false
 }
 
 func (current *coordinator) addOperationToLocalState(

@@ -29,33 +29,23 @@ type Dependencies struct {
 	Wake WakePolicy
 }
 
-// WakePolicy holds experimental rules for when tool results wake the model.
-// Each rule is off at its zero value, and the rules combine. An inbox input,
-// such as a user message or a heartbeat, always wakes the model.
+// WakePolicy holds a turn's results back so that the model is not woken
+// just to hear that a call is still running. Its zero value keeps the
+// default grace period. An inbox input, such as a user message or a
+// heartbeat, always wakes the model.
 type WakePolicy struct {
-	// Batch holds a turn's results until every call the turn issued has
-	// finished, so the model never sees a placeholder for its latest calls.
-	Batch bool
-	// Debounce holds a result that lands while other calls still run, for at
-	// most this long, so results that land close together arrive in one turn.
-	Debounce time.Duration
-	// AllDone has a turn that issues no tool calls while calls run sleep until
-	// every running call has finished or one has failed.
-	AllDone bool
-	// Yield returns how long a turn waits for a call before the call
-	// continues in the background and the model wakes with its output so
-	// far; zero keeps the grace period. A turn with a yielding call also
-	// holds its immediate results until the wait ends.
-	Yield func(llm.ToolCall) time.Duration
-	// Progress renders the output so far of a call that outlived its yield;
-	// nil or an empty result shows no output.
+	// Hold, when set, holds a turn's results, its immediate ones included,
+	// until every call the turn issued has finished. A call still running
+	// after Hold, from any turn, wakes the model with its output so far and
+	// stops holding the turn back.
+	Hold time.Duration
+	// ReleaseQuick, when set with Hold, releases the results held this long
+	// after the turn while its other calls still run, so the model can work
+	// beside them; those calls then wake it when they finish or after Hold.
+	ReleaseQuick time.Duration
+	// Progress renders the output so far of a call that outlived Hold; nil
+	// or an empty result shows no output.
 	Progress func([]operation.Operation) string
-}
-
-// holdsTurn reports whether the policy holds a turn's results past the
-// grace period.
-func (policy WakePolicy) holdsTurn() bool {
-	return policy.Batch || policy.Yield != nil
 }
 
 type Coordinator interface {
