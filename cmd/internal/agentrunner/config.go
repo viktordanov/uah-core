@@ -5,9 +5,9 @@ import (
 	"io"
 	"slices"
 
-	"github.com/unreallabsai/unreal-agent/harness/operation"
-	"github.com/unreallabsai/unreal-agent/harness/session"
-	"github.com/unreallabsai/unreal-agent/harness/tool"
+	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/unreal-agent/harness/session"
+	"github.com/viktordanov/unreal-agent/harness/tool"
 )
 
 type Config struct {

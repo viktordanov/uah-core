@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/llm"
 )
 
 func TestResolveMaxAttempts(t *testing.T) {

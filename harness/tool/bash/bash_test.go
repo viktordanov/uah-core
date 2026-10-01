@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/llm"
-	"github.com/unreallabsai/unreal-agent/harness/operation"
-	"github.com/unreallabsai/unreal-agent/harness/tool"
-	"github.com/unreallabsai/unreal-agent/harness/tool/bash"
+	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/unreal-agent/harness/tool"
+	"github.com/viktordanov/unreal-agent/harness/tool/bash"
 )
 
 type recordingContext struct {

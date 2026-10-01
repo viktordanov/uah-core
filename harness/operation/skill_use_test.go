@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/operation"
-	"github.com/unreallabsai/unreal-agent/harness/primitives"
+	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/unreal-agent/harness/primitives"
 )
 
 func TestLocalOperationManagerLoadsEntireSkill(t *testing.T) {

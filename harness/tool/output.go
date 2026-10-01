@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/unreallabsai/unreal-agent/harness/operation"
+	"github.com/viktordanov/unreal-agent/harness/operation"
 )
 
 func ErrorStatus(message string, limit int) CallStatus {

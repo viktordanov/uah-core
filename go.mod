@@ -1,4 +1,4 @@
-module github.com/unreallabsai/unreal-agent
+module github.com/viktordanov/unreal-agent
 
 go 1.27.0
 

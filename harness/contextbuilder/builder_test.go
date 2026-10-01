@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/inbox"
-	"github.com/unreallabsai/unreal-agent/harness/llm"
-	"github.com/unreallabsai/unreal-agent/harness/tool"
+	"github.com/viktordanov/unreal-agent/harness/inbox"
+	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/tool"
 )
 
 // withPreamble expects the items after the preamble every builder starts with.

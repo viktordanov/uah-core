@@ -10,10 +10,10 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/unreallabsai/unreal-agent/harness/inbox"
-	"github.com/unreallabsai/unreal-agent/harness/operation"
-	"github.com/unreallabsai/unreal-agent/harness/session"
-	"github.com/unreallabsai/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/unreal-agent/harness/inbox"
+	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/unreal-agent/harness/session"
+	"github.com/viktordanov/unreal-agent/harness/sessionstore"
 )
 
 var errCoordinatorFuzzFault = errors.New("injected coordinator dependency failure")

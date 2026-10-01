@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unreallabsai/unreal-agent/harness/inbox"
+	"github.com/viktordanov/unreal-agent/harness/inbox"
 )
 
 func TestInboxOutputsNewInputs(t *testing.T) {

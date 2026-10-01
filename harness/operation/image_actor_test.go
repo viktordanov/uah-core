@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/primitives"
+	"github.com/viktordanov/unreal-agent/harness/primitives"
 )
 
 func TestViewImageDispatchesComputeAndRecoveryRereads(t *testing.T) {

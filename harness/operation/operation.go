@@ -5,7 +5,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 
-	"github.com/unreallabsai/unreal-agent/harness/primitives"
+	"github.com/viktordanov/unreal-agent/harness/primitives"
 )
 
 var ErrUnsupported = errors.New("unsupported operation")

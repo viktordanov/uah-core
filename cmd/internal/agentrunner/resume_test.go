@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unreallabsai/unreal-agent/harness/inbox"
-	"github.com/unreallabsai/unreal-agent/harness/llm"
-	"github.com/unreallabsai/unreal-agent/harness/sessionstore"
-	"github.com/unreallabsai/unreal-agent/harness/sessionstore/localfile"
+	"github.com/viktordanov/unreal-agent/harness/inbox"
+	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/unreal-agent/harness/sessionstore/localfile"
 )
 
 func TestRunResumesAfterOutputFailure(t *testing.T) {

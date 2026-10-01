@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unreallabsai/unreal-agent/harness/operation"
-	"github.com/unreallabsai/unreal-agent/harness/session"
-	"github.com/unreallabsai/unreal-agent/harness/sessionstore"
-	"github.com/unreallabsai/unreal-agent/harness/tool"
+	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/unreal-agent/harness/session"
+	"github.com/viktordanov/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/unreal-agent/harness/tool"
 )
 
 func TestListSessions(t *testing.T) {

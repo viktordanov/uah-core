@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/primitives"
+	"github.com/viktordanov/unreal-agent/harness/primitives"
 )
 
 func TestShellReadChunksAreTransientAndRecoveryRereads(t *testing.T) {

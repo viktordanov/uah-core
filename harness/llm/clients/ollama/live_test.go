@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unreallabsai/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/llm"
 )
 
 func TestLiveToolRoundTrip(t *testing.T) {

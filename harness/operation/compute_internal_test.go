@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/unreallabsai/unreal-agent/harness/primitives"
+	"github.com/viktordanov/unreal-agent/harness/primitives"
 )
 
 func TestLocalOperationManagerDispatchesComputeAndDrainsAfterCancellation(t *testing.T) {

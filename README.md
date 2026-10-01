@@ -1,5 +1,15 @@
 # Unreal Agent
 
+> **This is a fork** of [unreallabsai/unreal-agent](https://github.com/unreallabsai/unreal-agent),
+> carried by [uah](https://github.com/viktordanov/uah) as its agent harness until
+> upstream merges two performance fixes. It is upstream `main` with those fixes,
+> under the module path `github.com/viktordanov/unreal-agent`:
+>
+> - Encode request history once, and reuse encoded items across requests
+>   ([`pr/request-encoding`](https://github.com/unreallabsai/unreal-agent/compare/main...viktordanov:unreal-agent:pr/request-encoding)).
+> - Serve a resumed session's history from the `Resume` read
+>   ([`pr/resume-write-state`](https://github.com/unreallabsai/unreal-agent/compare/main...viktordanov:unreal-agent:pr/resume-write-state)).
+
 An async-first agent harness from Unreal Labs.
 
 - [harness/](harness/) — the library.

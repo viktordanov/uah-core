@@ -3,9 +3,9 @@ package ollama
 import (
 	"strings"
 
-	"github.com/unreallabsai/unreal-agent/harness/llm"
-	"github.com/unreallabsai/unreal-agent/harness/llm/responsesapi"
-	"github.com/unreallabsai/unreal-agent/harness/primitives"
+	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/llm/responsesapi"
+	"github.com/viktordanov/unreal-agent/harness/primitives"
 )
 
 const BaseURL = "http://localhost:11434/v1"

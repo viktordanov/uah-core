@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unreallabsai/unreal-agent/harness/inbox"
-	"github.com/unreallabsai/unreal-agent/harness/llm"
-	"github.com/unreallabsai/unreal-agent/harness/session"
-	"github.com/unreallabsai/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/unreal-agent/harness/inbox"
+	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/session"
+	"github.com/viktordanov/unreal-agent/harness/sessionstore"
 )
 
 // BenchmarkResumeRunStart measures what a run does with a resumed session

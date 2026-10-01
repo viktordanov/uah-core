@@ -5,8 +5,8 @@ import (
 	"encoding/json/v2"
 	"fmt"
 
-	"github.com/unreallabsai/unreal-agent/harness/inbox"
-	"github.com/unreallabsai/unreal-agent/harness/session"
+	"github.com/viktordanov/unreal-agent/harness/inbox"
+	"github.com/viktordanov/unreal-agent/harness/session"
 )
 
 type itemJSON Item

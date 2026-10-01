@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/session"
+	"github.com/viktordanov/unreal-agent/harness/session"
 )
 
 func TestListSessionEntriesSkipsRemovedFiles(t *testing.T) {

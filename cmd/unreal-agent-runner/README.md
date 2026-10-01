@@ -6,7 +6,7 @@ JSONL and exits when the task finishes.
 Install with Go 1.27+:
 
 ```sh
-go install github.com/unreallabsai/unreal-agent/cmd/unreal-agent-runner@latest
+go install github.com/viktordanov/unreal-agent/cmd/unreal-agent-runner@latest
 ```
 
 Set an OpenAI API key and run a prompt in the current directory:

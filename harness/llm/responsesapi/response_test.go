@@ -4,7 +4,7 @@ import (
 	"encoding/json/v2"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/llm"
 )
 
 func TestResponseConvertsWebSearchResponse(t *testing.T) {

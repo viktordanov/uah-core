@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/cmd/internal/agentrunner"
-	"github.com/unreallabsai/unreal-agent/harness/tool"
+	"github.com/viktordanov/unreal-agent/cmd/internal/agentrunner"
+	"github.com/viktordanov/unreal-agent/harness/tool"
 )
 
 func TestParseRequestConfiguresStaticTools(t *testing.T) {

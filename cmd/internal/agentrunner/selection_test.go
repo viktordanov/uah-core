@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unreallabsai/unreal-agent/harness/llm"
-	"github.com/unreallabsai/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/unreal-agent/harness/sessionstore"
 )
 
 func TestRunSelectsToolsFromStartupConfiguration(t *testing.T) {
