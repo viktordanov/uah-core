@@ -1,6 +1,7 @@
 package responsesapi
 
 import (
+	"bytes"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
@@ -31,7 +32,6 @@ func requestBody(request llm.Request, promptCacheKey string, extensions map[stri
 		Store:   &store,
 		Stream:  new(true),
 		Include: &include,
-		Input:   &input,
 	}
 	if promptCacheKey != "" {
 		params.PromptCacheKey = &promptCacheKey
@@ -54,20 +54,40 @@ func requestBody(request llm.Request, promptCacheKey string, extensions map[stri
 	if len(tools) != 0 {
 		params.Tools = &tools
 	}
+	if len(extensions) != 0 {
+		return extendRequestBody(params, input, extensions)
+	}
+	if len(input) != 0 {
+		// The placeholder is encoded from the items directly, so the history
+		// is not copied into an intermediate union value first.
+		params.Input = &openaiapi.InputParam{}
+	}
+	body := input.buffer()
+	if err := json.MarshalWrite(body, params, json.Deterministic(true), json.WithMarshalers(
+		json.MarshalToFunc(func(encoder *jsontext.Encoder, _ openaiapi.InputParam) error {
+			return input.MarshalJSONTo(encoder)
+		}),
+	)); err != nil {
+		return nil, fmt.Errorf("encode response request: %w", err)
+	}
+	return body.Bytes(), nil
+}
+
+func extendRequestBody(params openaiapi.CreateResponse, input requestInputItems, extensions map[string]jsontext.Value) ([]byte, error) {
 	body, err := json.Marshal(params, json.Deterministic(true))
 	if err != nil {
 		return nil, fmt.Errorf("encode response request: %w", err)
 	}
-	if len(extensions) == 0 {
-		return body, nil
-	}
-	return extendRequestBody(body, extensions)
-}
-
-func extendRequestBody(body []byte, extensions map[string]jsontext.Value) ([]byte, error) {
-	var fields map[string]jsontext.Value
-	if err := json.Unmarshal(body, &fields); err != nil {
+	var standard map[string]jsontext.Value
+	if err := json.Unmarshal(body, &standard); err != nil {
 		return nil, fmt.Errorf("decode response request: %w", err)
+	}
+	fields := make(map[string]any, len(standard)+1+len(extensions))
+	for name, value := range standard {
+		fields[name] = value
+	}
+	if len(input) != 0 {
+		fields["input"] = input
 	}
 	for name, value := range extensions {
 		if _, standard := fields[name]; standard {
@@ -78,40 +98,63 @@ func extendRequestBody(body []byte, extensions map[string]jsontext.Value) ([]byt
 		}
 		fields[name] = value
 	}
-	extended, err := json.Marshal(fields, json.Deterministic(true))
-	if err != nil {
+	extended := input.buffer()
+	if err := json.MarshalWrite(extended, fields, json.Deterministic(true)); err != nil {
 		return nil, fmt.Errorf("encode response request: %w", err)
 	}
-	return extended, nil
+	return extended.Bytes(), nil
 }
 
-func requestInput(items []llm.Item) (openaiapi.InputParam, error) {
-	converted := make(openaiapi.InputParam1, 0, len(items))
+// requestInputItems holds each input item encoded once, so building a request
+// costs one pass over the history rather than one per nested union.
+type requestInputItems []jsontext.Value
+
+func (items requestInputItems) MarshalJSONTo(encoder *jsontext.Encoder) error {
+	if err := encoder.WriteToken(jsontext.BeginArray); err != nil {
+		return err
+	}
+	for _, item := range items {
+		if err := encoder.WriteValue(item); err != nil {
+			return err
+		}
+	}
+	return encoder.WriteToken(jsontext.EndArray)
+}
+
+// buffer returns an empty buffer that holds the encoded items and the
+// request's other fields without growing, since a large history would
+// otherwise be copied each time the buffer grows.
+func (items requestInputItems) buffer() *bytes.Buffer {
+	size := 4 << 10
+	for _, item := range items {
+		size += len(item) + len(",")
+	}
+	// An encoder writing to a bytes.Buffer grows it whenever less than a
+	// quarter of the written length remains available.
+	return bytes.NewBuffer(make([]byte, 0, size+size/4))
+}
+
+func requestInput(items []llm.Item) (requestInputItems, error) {
+	converted := make(requestInputItems, 0, len(items))
 	for index, item := range items {
 		input, err := requestInputItem(item)
 		if err != nil {
-			return openaiapi.InputParam{}, fmt.Errorf("input item %d: %w", index, err)
+			return nil, fmt.Errorf("input item %d: %w", index, err)
 		}
 		converted = append(converted, input)
 	}
-
-	var input openaiapi.InputParam
-	if err := input.FromInputParam1(converted); err != nil {
-		return openaiapi.InputParam{}, fmt.Errorf("encode input: %w", err)
-	}
-	return input, nil
+	return converted, nil
 }
 
-func requestInputItem(source llm.Item) (openaiapi.InputItem, error) {
-	var item openaiapi.InputItem
+func requestInputItem(source llm.Item) (jsontext.Value, error) {
 	if source.Type == llm.ItemMessage && source.ProviderID == "" {
 		message, ok := source.Data.(llm.Message)
 		if !ok {
-			return item, fmt.Errorf("message item data must be llm.Message, got %T", source.Data)
+			return nil, fmt.Errorf("message item data must be llm.Message, got %T", source.Data)
 		}
 		var content openaiapi.EasyInputMessage_Content
 		if err := content.FromEasyInputMessageContent0(message.Text); err != nil {
-			return item, err
+			return nil, err
 		}
 		converted := openaiapi.EasyInputMessage{
 			Content: content,
@@ -121,20 +164,14 @@ func requestInputItem(source llm.Item) (openaiapi.InputItem, error) {
 			phase := openaiapi.MessagePhase(message.Phase)
 			converted.Phase = &phase
 		}
-		if err := setUnion(&item, converted); err != nil {
-			return item, err
-		}
-		return item, nil
+		return json.Marshal(converted, json.Deterministic(true))
 	}
 
 	converted, err := requestItem(source)
 	if err != nil {
-		return item, err
+		return nil, err
 	}
-	if err := setUnion(&item, converted); err != nil {
-		return item, err
-	}
-	return item, nil
+	return converted.MarshalJSON()
 }
 
 func requestItem(source llm.Item) (openaiapi.Item, error) {
