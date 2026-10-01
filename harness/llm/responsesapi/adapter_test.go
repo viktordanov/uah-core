@@ -342,7 +342,7 @@ func TestNewAdapterRequiresDependencies(t *testing.T) {
 }
 
 func TestRequestInputRejectsUnsupportedType(t *testing.T) {
-	_, err := requestInputItem(llm.Item{Type: "image"})
+	_, err := requestInputItem(llm.Item{Type: "image"}, nil)
 	if err == nil || err.Error() != `unsupported input item type "image"` {
 		t.Fatalf("error = %v", err)
 	}

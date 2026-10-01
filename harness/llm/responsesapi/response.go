@@ -133,6 +133,37 @@ func responseOutputItem(source openaiapi.OutputItem) (llm.Item, bool, error) {
 				Arguments: call.Arguments,
 			},
 		}, true, nil
+	case "custom_tool_call":
+		call, err := source.AsCustomToolCall()
+		if err != nil {
+			return llm.Item{}, false, err
+		}
+		// The generated type has no status, though the provider sends one.
+		var status struct {
+			Status string `json:"status"`
+		}
+		raw, err := source.MarshalJSON()
+		if err != nil {
+			return llm.Item{}, false, err
+		}
+		if err := json.Unmarshal(raw, &status); err != nil {
+			return llm.Item{}, false, err
+		}
+		switch openaiapi.FunctionToolCallStatus(status.Status) {
+		case openaiapi.FunctionToolCallStatusInProgress,
+			openaiapi.FunctionToolCallStatusIncomplete:
+			return llm.Item{}, false, nil
+		}
+		return llm.Item{
+			ProviderID: dereference(call.Id),
+			Type:       llm.ItemToolCall,
+			Data: llm.ToolCall{
+				CallID:    call.CallId,
+				Name:      call.Name,
+				Arguments: call.Input,
+				Custom:    true,
+			},
+		}, true, nil
 	case "reasoning":
 		reasoning, err := source.AsReasoningItem()
 		if err != nil {

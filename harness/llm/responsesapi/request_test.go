@@ -38,7 +38,7 @@ func TestRequestInputItemReplaysToolCallArguments(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			call := llm.ToolCall{CallID: "call-1", Name: "Bash", Arguments: test.arguments}
 			source := llm.Item{ProviderID: "function-1", Type: llm.ItemToolCall, Data: call}
-			item, err := requestInputItem(source)
+			item, err := requestInputItem(source, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -223,7 +223,7 @@ func TestRequestInputItemPreservesIdentifiedInputMessageRoles(t *testing.T) {
 				ProviderID: "message-1",
 				Type:       llm.ItemMessage,
 				Data:       llm.Message{Role: role, Text: "hello"},
-			})
+			}, nil)
 			if err != nil {
 				t.Fatalf("convert item: %v", err)
 			}
@@ -264,7 +264,7 @@ func TestRequestInputItemReplaysRawReasoningVerbatim(t *testing.T) {
 			Summary: []string{"stale summary"},
 			Raw:     jsontext.Value(raw),
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("convert item: %v", err)
 	}

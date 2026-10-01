@@ -31,10 +31,13 @@ type Message struct {
 	Phase string
 }
 
+// Custom marks a call to a custom tool. Its Arguments hold the raw input text
+// the model wrote rather than a JSON object.
 type ToolCall struct {
 	CallID    string
 	Name      string
 	Arguments string
+	Custom    bool `json:",omitzero"`
 }
 
 type ToolResultKind string
@@ -67,6 +70,9 @@ type ToolType string
 const (
 	ToolFunction ToolType = "function"
 	ToolHosted   ToolType = "hosted"
+	// ToolCustom takes free-form text input instead of JSON arguments. Its
+	// calls arrive with ToolCall.Custom set.
+	ToolCustom ToolType = "custom"
 )
 
 type Tool struct {
@@ -74,6 +80,15 @@ type Tool struct {
 	Name        string
 	Description string
 	Parameters  map[string]any
+	// Grammar constrains a custom tool's input. Nil leaves it unconstrained text.
+	Grammar *ToolGrammar `json:",omitzero"`
+}
+
+// ToolGrammar is a grammar the provider samples a custom tool's input from.
+type ToolGrammar struct {
+	// Syntax is "lark" or "regex".
+	Syntax     string
+	Definition string
 }
 
 type Model struct {

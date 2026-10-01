@@ -16,6 +16,9 @@ func TestItemJSONRoundTrip(t *testing.T) {
 		{ProviderID: "call-1", Type: ItemToolCall, Data: ToolCall{
 			CallID: "call-1", Name: "test", Arguments: `{}`,
 		}},
+		{ProviderID: "ctc-1", Type: ItemToolCall, Data: ToolCall{
+			CallID: "call-2", Name: "apply_patch", Arguments: "*** Begin Patch\n*** End Patch", Custom: true,
+		}},
 		{ProviderID: "result-1", Type: ItemToolResult, Data: ToolResult{
 			CallID: "call-1", Output: []ToolResultOutput{{Kind: ToolResultText, Value: "done"}},
 		}},
@@ -95,5 +98,16 @@ func TestItemJSONRejectsInvalidTagAndData(t *testing.T) {
 		if err := json.Unmarshal([]byte(encoded), &item); err == nil {
 			t.Fatalf("decoded invalid item %s", encoded)
 		}
+	}
+}
+
+func TestItemJSONOmitsFunctionCallCustomField(t *testing.T) {
+	encoded, err := json.Marshal(Item{Type: ItemToolCall, Data: ToolCall{CallID: "call-1", Name: "test", Arguments: `{}`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"ProviderID":"","Type":"tool_call","Data":{"CallID":"call-1","Name":"test","Arguments":"{}"}}`
+	if string(encoded) != want {
+		t.Fatalf("encoded = %s, want %s", encoded, want)
 	}
 }

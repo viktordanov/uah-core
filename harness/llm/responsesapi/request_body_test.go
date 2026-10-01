@@ -44,12 +44,21 @@ func TestRequestBodyMatchesLegacyEncoding(t *testing.T) {
 		}}},
 		llm.Item{Type: llm.ItemToolResult, Data: llm.ToolResult{CallID: "call-2"}},
 		llm.Item{Type: llm.ItemToolCall, Data: llm.ToolCall{CallID: "call-3", Name: "Bash", Arguments: " \n{\"a\": [1, 2]} "}},
+		llm.Item{ProviderID: "ctc_1", Type: llm.ItemToolCall, Data: llm.ToolCall{
+			CallID: "call-4", Name: "apply_patch", Arguments: "*** Begin Patch\n+\"<x>\" \u2028\n*** End Patch", Custom: true,
+		}},
+		llm.Item{Type: llm.ItemToolResult, Data: llm.ToolResult{CallID: "call-4", Output: []llm.ToolResultOutput{
+			{Kind: llm.ToolResultText, Value: "Done & <ok>"},
+		}}},
 	)
 	maxOutputTokens := int64(4096)
 	tools := []llm.Tool{
 		{Type: llm.ToolFunction, Name: "Bash", Description: "Run <a> command", Parameters: map[string]any{
 			"type": "object", "properties": map[string]any{"command": map[string]any{"type": "string"}}}},
 		{Type: llm.ToolHosted, Name: "web_search"},
+		{Type: llm.ToolCustom, Name: "apply_patch", Description: "Edit <files>", Grammar: &llm.ToolGrammar{
+			Syntax: "lark", Definition: "start: \"*** Begin Patch\" LF\n%import common.LF\n",
+		}},
 	}
 	extensions := map[string]jsontext.Value{
 		"provider": jsontext.Value(`{"sort" : "throughput", "only":["a<b"]}`),
@@ -365,8 +374,9 @@ func legacyExtendRequestBody(body []byte, extensions map[string]jsontext.Value) 
 
 func legacyRequestInput(items []llm.Item) (openaiapi.InputParam, error) {
 	converted := make(openaiapi.InputParam1, 0, len(items))
+	custom := customCalls(items)
 	for index, item := range items {
-		input, err := legacyRequestInputItem(item)
+		input, err := legacyRequestInputItem(item, custom)
 		if err != nil {
 			return openaiapi.InputParam{}, fmt.Errorf("input item %d: %w", index, err)
 		}
@@ -380,7 +390,7 @@ func legacyRequestInput(items []llm.Item) (openaiapi.InputParam, error) {
 	return input, nil
 }
 
-func legacyRequestInputItem(source llm.Item) (openaiapi.InputItem, error) {
+func legacyRequestInputItem(source llm.Item, custom map[string]bool) (openaiapi.InputItem, error) {
 	var item openaiapi.InputItem
 	if source.Type == llm.ItemMessage && source.ProviderID == "" {
 		message, ok := source.Data.(llm.Message)
@@ -405,7 +415,7 @@ func legacyRequestInputItem(source llm.Item) (openaiapi.InputItem, error) {
 		return item, nil
 	}
 
-	converted, err := requestItem(source)
+	converted, err := requestItem(source, custom)
 	if err != nil {
 		return item, err
 	}
