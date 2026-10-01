@@ -71,6 +71,7 @@ type adapter struct {
 	cacheKeyPlacement CacheKeyPlacement
 	maxAttempts       int
 	extensions        map[string]jsontext.Value
+	inputs            inputCache
 }
 
 var _ llm.Adapter = (*adapter)(nil)
@@ -109,7 +110,11 @@ func (adapter *adapter) Respond(ctx context.Context, request llm.Request, option
 	if adapter.cacheKeyPlacement.UsePromptCacheKeyField {
 		promptCacheKey = key
 	}
-	body, err := requestBody(request, promptCacheKey, adapter.extensions)
+	input, err := adapter.inputs.encode(request.Input)
+	if err != nil {
+		return llm.Response{}, err
+	}
+	body, err := encodeRequestBody(request, input, promptCacheKey, adapter.extensions)
 	if err != nil {
 		return llm.Response{}, err
 	}

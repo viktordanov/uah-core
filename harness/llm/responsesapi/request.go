@@ -6,6 +6,8 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"slices"
+	"sync"
 
 	"github.com/unreallabsai/unreal-agent/harness/llm"
 	"github.com/unreallabsai/unreal-agent/internal/openaiapi"
@@ -16,6 +18,15 @@ func requestBody(request llm.Request, promptCacheKey string, extensions map[stri
 	if err != nil {
 		return nil, err
 	}
+	return encodeRequestBody(request, input, promptCacheKey, extensions)
+}
+
+func encodeRequestBody(
+	request llm.Request,
+	input requestInputItems,
+	promptCacheKey string,
+	extensions map[string]jsontext.Value,
+) ([]byte, error) {
 	tools, err := requestTools(request.Tools)
 	if err != nil {
 		return nil, err
@@ -144,6 +155,63 @@ func requestInput(items []llm.Item) (requestInputItems, error) {
 		converted = append(converted, input)
 	}
 	return converted, nil
+}
+
+// inputCache keeps the previous request's input items and their encodings.
+// Each request resends the conversation with new items appended, so only items
+// that differ from the previous request's item at the same index are encoded.
+// An item's encoding depends only on the item, and item data is not changed in
+// place once built.
+type inputCache struct {
+	mu      sync.Mutex
+	items   []llm.Item
+	encoded requestInputItems
+}
+
+func (cache *inputCache) encode(items []llm.Item) (requestInputItems, error) {
+	cache.mu.Lock()
+	previous, previousEncoded := cache.items, cache.encoded
+	cache.mu.Unlock()
+
+	encoded := make(requestInputItems, 0, len(items))
+	for index, item := range items {
+		if index < len(previous) && sameItem(item, previous[index]) {
+			encoded = append(encoded, previousEncoded[index])
+			continue
+		}
+		input, err := requestInputItem(item)
+		if err != nil {
+			return nil, fmt.Errorf("input item %d: %w", index, err)
+		}
+		encoded = append(encoded, input)
+	}
+
+	cache.mu.Lock()
+	cache.items, cache.encoded = slices.Clone(items), encoded
+	cache.mu.Unlock()
+	return encoded, nil
+}
+
+func sameItem(item, other llm.Item) bool {
+	if item.ProviderID != other.ProviderID || item.Type != other.Type {
+		return false
+	}
+	switch data := item.Data.(type) {
+	case llm.Message:
+		otherData, ok := other.Data.(llm.Message)
+		return ok && data == otherData
+	case llm.ToolCall:
+		otherData, ok := other.Data.(llm.ToolCall)
+		return ok && data == otherData
+	case llm.ToolResult:
+		otherData, ok := other.Data.(llm.ToolResult)
+		return ok && data.CallID == otherData.CallID && slices.Equal(data.Output, otherData.Output)
+	case llm.Reasoning:
+		otherData, ok := other.Data.(llm.Reasoning)
+		return ok && slices.Equal(data.Summary, otherData.Summary) && bytes.Equal(data.Raw, otherData.Raw)
+	default:
+		return false
+	}
 }
 
 func requestInputItem(source llm.Item) (jsontext.Value, error) {

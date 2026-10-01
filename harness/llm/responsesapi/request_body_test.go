@@ -5,6 +5,7 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -100,6 +101,81 @@ func TestRequestBodyMatchesLegacyEncoding(t *testing.T) {
 	}
 }
 
+func TestInputCacheMatchesLegacyEncoding(t *testing.T) {
+	history := benchmarkRequest(6).Input
+	edited := slices.Clone(history)
+	edited[3] = llm.Item{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleUser, Text: "edited"}}
+	result := history[4].Data.(llm.ToolResult)
+	result.Output = []llm.ToolResultOutput{{Kind: llm.ToolResultText, Value: result.Output[0].Value + "more"}}
+	changedResult := slices.Clone(history)
+	changedResult[4] = llm.Item{Type: llm.ItemToolResult, Data: result}
+	reasoning := history[2].Data.(llm.Reasoning)
+	reasoning.Raw = slices.Clone(reasoning.Raw)
+	reasoning.Raw[len(reasoning.Raw)-3] = 'x'
+	changedReasoning := slices.Clone(history)
+	changedReasoning[2] = llm.Item{Type: llm.ItemReasoning, Data: reasoning}
+	providerID := slices.Clone(history)
+	providerID[3].ProviderID = "msg_new"
+	steps := []struct {
+		name  string
+		input []llm.Item
+		fails bool
+	}{
+		{name: "first", input: history[:6]},
+		{name: "appended", input: history[:16]},
+		{name: "unchanged", input: history[:16]},
+		{name: "rewound", input: history[:11]},
+		{name: "edited", input: edited},
+		{name: "unsupported", input: append(slices.Clone(history), llm.Item{Type: "image"}), fails: true},
+		{name: "after failure", input: history},
+		{name: "changed tool result", input: changedResult},
+		{name: "changed reasoning", input: changedReasoning},
+		{name: "changed provider ID", input: providerID},
+		{name: "empty"},
+		{name: "full", input: history},
+	}
+	var cache inputCache
+	for _, step := range steps {
+		request := llm.Request{Model: llm.Model{ID: "gpt-test"}, Input: step.input}
+		want, wantErr := legacyRequestBody(request, "", nil)
+		input, err := cache.encode(step.input)
+		if (err != nil) != step.fails || (wantErr != nil) != step.fails {
+			t.Fatalf("%s: error = %v, legacy error = %v", step.name, err, wantErr)
+		}
+		if step.fails {
+			if err.Error() != wantErr.Error() {
+				t.Fatalf("%s: error = %v, want %v", step.name, err, wantErr)
+			}
+			continue
+		}
+		got, err := encodeRequestBody(request, input, "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("%s: body =\n%s\nwant\n%s", step.name, got, want)
+		}
+	}
+}
+
+func TestInputCacheReusesUnchangedItems(t *testing.T) {
+	history := benchmarkRequest(2).Input
+	var cache inputCache
+	first, err := cache.encode(history[:6])
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := cache.encode(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range first {
+		if &first[index][0] != &second[index][0] {
+			t.Fatalf("item %d was encoded again", index)
+		}
+	}
+}
+
 func BenchmarkRequestBody(b *testing.B) {
 	extensions := map[string]jsontext.Value{"provider": jsontext.Value(`{"sort":"throughput"}`)}
 	for _, turns := range []int{100, 1000} {
@@ -123,6 +199,30 @@ func BenchmarkRequestBody(b *testing.B) {
 				}
 			})
 		}
+		// An adapter's next request: the previous request's history plus one turn.
+		previous := request.Input[:len(request.Input)-5]
+		var warm inputCache
+		if _, err := warm.encode(previous); err != nil {
+			b.Fatal(err)
+		}
+		body, err := requestBody(request, "cache-key", nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.Run(fmt.Sprintf("turns=%d/next", turns), func(b *testing.B) {
+			b.SetBytes(int64(len(body)))
+			b.ReportAllocs()
+			for b.Loop() {
+				cache := inputCache{items: warm.items, encoded: warm.encoded}
+				input, err := cache.encode(request.Input)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if _, err := encodeRequestBody(request, input, "cache-key", nil); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
