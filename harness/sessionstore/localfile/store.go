@@ -26,14 +26,15 @@ type cachedWriteState struct {
 	committedSize int64
 }
 
-// resumedSession is the state Resume decoded, with the file it decoded it
-// from. Until the session is written, it serves the history pages and the
-// first write state of the run that resumed the session, while the file is
-// unchanged.
+// resumedSession is what Resume decoded, with the file it decoded it from.
+// While the file is unchanged, the items serve the history pages of the run
+// that resumed the session until a page reaches the end, and the head serves
+// its first write.
 type resumedSession struct {
 	id            session.ID
 	file          os.FileInfo
-	state         storedState
+	items         []sessionstore.Item
+	head          sessionHead
 	committedSize int64
 }
 
@@ -114,21 +115,35 @@ func (store *Store) Items(
 		return sessionstore.Page{}, fmt.Errorf("item page limit must be positive")
 	}
 
-	state, _, err := store.readResumedState(ctx, id, false)
-	if err != nil {
+	if err := validateSessionID(id); err != nil {
 		return sessionstore.Page{}, err
 	}
-	start := min(uint64(after), uint64(len(state.Items)))
-	end := min(start+uint64(limit), uint64(len(state.Items)))
-	items := append([]sessionstore.Item(nil), state.Items[start:end]...)
+	if err := context.Cause(ctx); err != nil {
+		return sessionstore.Page{}, err
+	}
+	history, resumed := store.resumedItems(id)
+	if !resumed {
+		state, _, err := store.readState(ctx, id)
+		if err != nil {
+			return sessionstore.Page{}, err
+		}
+		history = state.Items
+	}
+	start := min(uint64(after), uint64(len(history)))
+	end := min(start+uint64(limit), uint64(len(history)))
+	items := append([]sessionstore.Item(nil), history[start:end]...)
 	nextAfter := after
 	if len(items) > 0 {
 		nextAfter = items[len(items)-1].Sequence
 	}
+	if resumed && end == uint64(len(history)) {
+		// The restore has the history now; a later read is not part of it.
+		store.releaseResumedItems(id)
+	}
 	return sessionstore.Page{
 		Items:     items,
 		NextAfter: nextAfter,
-		More:      end < uint64(len(state.Items)),
+		More:      end < uint64(len(history)),
 	}, nil
 }
 
@@ -250,7 +265,13 @@ func (store *Store) Resume(ctx context.Context, id session.ID) (sessionstore.Res
 	}
 	if statErr == nil {
 		store.resumedMutex.Lock()
-		store.resumed = &resumedSession{id: id, file: file, state: state, committedSize: committedSize}
+		store.resumed = &resumedSession{
+			id:            id,
+			file:          file,
+			items:         state.Items,
+			head:          state.sessionHead,
+			committedSize: committedSize,
+		}
 		store.resumedMutex.Unlock()
 	}
 	return state.resume(), nil
@@ -319,35 +340,53 @@ func (store *Store) readState(
 	return state, committedSize, nil
 }
 
-// readResumedState returns the state Resume decoded while the session file is
-// unchanged, and reads the file otherwise. A write takes the state, since it
-// changes the head and the file.
-func (store *Store) readResumedState(
-	ctx context.Context,
-	id session.ID,
-	write bool,
-) (storedState, int64, error) {
-	if err := validateSessionID(id); err != nil {
-		return storedState{}, 0, err
-	}
-	if err := context.Cause(ctx); err != nil {
-		return storedState{}, 0, err
-	}
+// resumedItems returns the history Resume decoded, while the file is
+// unchanged and no page has reached its end.
+func (store *Store) resumedItems(id session.ID) ([]sessionstore.Item, bool) {
 	store.resumedMutex.Lock()
 	resumed := store.resumed
-	if resumed != nil && resumed.id == id && write {
+	store.resumedMutex.Unlock()
+	if resumed == nil || resumed.id != id || resumed.items == nil || !store.unchanged(resumed) {
+		return nil, false
+	}
+	return resumed.items, true
+}
+
+// takeResumedHead returns the head Resume decoded for a write, while the file
+// is unchanged. The write changes the head and the file, so it takes them.
+func (store *Store) takeResumedHead(id session.ID) (sessionHead, int64, bool) {
+	store.resumedMutex.Lock()
+	resumed := store.resumed
+	if resumed != nil && resumed.id == id {
 		store.resumed = nil
 	}
 	store.resumedMutex.Unlock()
-	if resumed != nil && resumed.id == id {
-		file, err := os.Stat(store.sessionPath(id))
-		if err == nil && os.SameFile(file, resumed.file) &&
-			file.Size() == resumed.file.Size() && file.ModTime().Equal(resumed.file.ModTime()) {
-			return resumed.state, resumed.committedSize, nil
-		}
-		store.evictResumedState(id)
+	if resumed == nil || resumed.id != id || !store.unchanged(resumed) {
+		return sessionHead{}, 0, false
 	}
-	return store.readState(ctx, id)
+	return resumed.head, resumed.committedSize, true
+}
+
+func (store *Store) releaseResumedItems(id session.ID) {
+	store.resumedMutex.Lock()
+	if store.resumed != nil && store.resumed.id == id {
+		released := *store.resumed
+		released.items = nil
+		store.resumed = &released
+	}
+	store.resumedMutex.Unlock()
+}
+
+// unchanged reports whether the session file is the one Resume decoded, and
+// forgets what Resume decoded when it is not.
+func (store *Store) unchanged(resumed *resumedSession) bool {
+	file, err := os.Stat(store.sessionPath(resumed.id))
+	if err == nil && os.SameFile(file, resumed.file) &&
+		file.Size() == resumed.file.Size() && file.ModTime().Equal(resumed.file.ModTime()) {
+		return true
+	}
+	store.evictResumedState(resumed.id)
+	return false
 }
 
 func (store *Store) evictResumedState(id session.ID) {
@@ -372,7 +411,11 @@ func (store *Store) loadWriteState(
 		store.evictResumedState(id)
 		return head, committedSize, nil
 	}
-	state, committedSize, err := store.readResumedState(ctx, id, true)
+	if head, committedSize, ok := store.takeResumedHead(id); ok {
+		store.putCachedWriteState(id, head, committedSize)
+		return head, committedSize, nil
+	}
+	state, committedSize, err := store.readState(ctx, id)
 	if err != nil {
 		return sessionHead{}, 0, err
 	}

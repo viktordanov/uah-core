@@ -135,6 +135,11 @@ func TestResumedSessionReadsTheFileOnce(t *testing.T) {
 	if got := readAllItems(t, store, id); !reflect.DeepEqual(got, want) {
 		t.Fatalf("items = %#v\nwant %#v", got, want)
 	}
+	// The history was read to its end, so the store let it go: a later read
+	// is not the restore's.
+	if _, err := store.Items(t.Context(), id, sessionstore.BeforeFirst, 1); err == nil {
+		t.Fatal("a second read of the history did not read the session file")
+	}
 	if err := store.AppendTurn(t.Context(), id, session.Turn{
 		ID: "turn-next", PreviousTurnID: "turn-4", Type: session.TurnRegular,
 	}); err != nil {
