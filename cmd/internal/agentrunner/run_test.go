@@ -344,7 +344,7 @@ func TestRunMainExecutesBashToolToCompletion(t *testing.T) {
 					}
 					return ""
 				},
-				func() []string { return []string{"PATH=/usr/bin:/bin", "UNREAL_HARNESS_LLM_API_KEY=secret"} },
+				func() []string { return []string{"PATH=/usr/bin:/bin", "UAH_LLM_API_KEY=secret"} },
 				strings.NewReader(`{"messages":[{"role":"user","content":"run it"}],"model":"gpt-test"}`),
 				&stdout,
 				&stderr,

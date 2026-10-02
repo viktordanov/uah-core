@@ -113,7 +113,7 @@ func TestEnvironmentConfig(t *testing.T) {
 	}{
 		{name: "injected home takes precedence", processHome: "/process/home", env: map[string]string{"HOME": " /injected/home "}, file: "/injected/home/.codex/auth.json"},
 		{name: "injected home without process home", env: map[string]string{"HOME": "/injected/home"}, file: "/injected/home/.codex/auth.json"},
-		{name: "home default", env: map[string]string{"HOME": "/home/example", "OPENAI_API_KEY": "sk-api", "UNREAL_HARNESS_LLM_API_KEY": "sk-generic"}, file: "/home/example/.codex/auth.json"},
+		{name: "home default", env: map[string]string{"HOME": "/home/example", "OPENAI_API_KEY": "sk-api", "UAH_LLM_API_KEY": "sk-generic"}, file: "/home/example/.codex/auth.json"},
 		{name: "process home fallback", processHome: "/process/home", file: "/process/home/.codex/auth.json"},
 		{name: "missing home", invalid: true},
 		{name: "codex home", env: map[string]string{"CODEX_HOME": "/custom/codex"}, file: "/custom/codex/auth.json"},

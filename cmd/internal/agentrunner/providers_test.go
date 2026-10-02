@@ -39,15 +39,15 @@ func TestRunnerProviderRetries(t *testing.T) {
 					[]string{"-workspace", t.TempDir(), "-session-directory", t.TempDir()},
 					func(name string) string {
 						switch name {
-						case "UNREAL_HARNESS_LLM_PROVIDER":
+						case "UAH_LLM_PROVIDER":
 							return provider.Name
-						case "UNREAL_HARNESS_LLM_BASE_URL":
+						case "UAH_LLM_BASE_URL":
 							return server.URL
 						case "OPENAI_CODEX_ACCESS_TOKEN":
 							return "subscription-token"
 						case "OPENAI_CODEX_ACCOUNT_ID":
 							return "account-1"
-						case "UNREAL_HARNESS_LLM_API_KEY":
+						case "UAH_LLM_API_KEY":
 							return "test-key"
 						default:
 							return ""
@@ -96,10 +96,10 @@ func TestRunnerCodexUsesSubscriptionWithoutAPIKey(t *testing.T) {
 	var output, stderr strings.Builder
 	code := RunMain(t.Context(), []string{"-workspace", t.TempDir(), "-session-directory", t.TempDir()}, func(key string) string {
 		return map[string]string{
-			"UNREAL_HARNESS_LLM_PROVIDER": "openai-codex",
-			"UNREAL_HARNESS_LLM_BASE_URL": server.URL,
-			"OPENAI_CODEX_ACCESS_TOKEN":   "subscription-token",
-			"OPENAI_CODEX_ACCOUNT_ID":     "account",
+			"UAH_LLM_PROVIDER":          "openai-codex",
+			"UAH_LLM_BASE_URL":          server.URL,
+			"OPENAI_CODEX_ACCESS_TOKEN": "subscription-token",
+			"OPENAI_CODEX_ACCOUNT_ID":   "account",
 		}[key]
 	}, func() []string { return nil }, strings.NewReader(`{"prompt":"hello","model":"gpt-test","system_prompt":"my system prompt"}`), &output, &stderr, Config{Name: "uah-core-runner", ParseRequest: parseTestRequest, Providers: DefaultProviders()})
 	if code != 0 || !strings.Contains(output.String(), "subscription works") {

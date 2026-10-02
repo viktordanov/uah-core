@@ -14,9 +14,9 @@ Request schema (JSON object; unknown fields are rejected):
     Shorthand for one user message; used when messages is absent.
     Supply messages or prompt. messages takes precedence when both are present.
   model: string (optional)
-    Provider model ID; defaults to UNREAL_HARNESS_LLM_MODEL or the provider default.
+    Provider model ID; defaults to UAH_LLM_MODEL or the provider default.
   max_attempts: positive integer (optional)
-    Overrides UNREAL_HARNESS_LLM_MAX_ATTEMPTS (default 5); 1 disables retries.
+    Overrides UAH_LLM_MAX_ATTEMPTS (default 5); 1 disables retries.
   system_prompt: string (optional)
     Replaces the default system prompt.
   thinking_level: "low" | "medium" | "high" | "xhigh" | "max" (optional; default "high")

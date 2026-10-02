@@ -38,11 +38,9 @@ uah-core-runner '{"prompt":"Summarize this project."}'
 uah-core-runner < request.json
 ```
 
-OpenAI is the default provider. Set `UNREAL_HARNESS_LLM_PROVIDER` to `openai`,
+OpenAI is the default provider. Set `UAH_LLM_PROVIDER` to `openai`,
 `openai-codex`, `openrouter`, `fireworks`, or `ollama`, and
-`UNREAL_HARNESS_LLM_MODEL` to choose a model. The `UNREAL_HARNESS_LLM_*`
-variables keep the names of the runner uah-core derives from, so existing
-setups and wrappers such as uagent keep working.
+`UAH_LLM_MODEL` to choose a model.
 
 Run `uah-core-runner -h` for options and the JSON request fields.
 

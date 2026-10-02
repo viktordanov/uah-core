@@ -33,8 +33,7 @@ v0.2.0 (MIT, Copyright (c) 2026 Unreal Labs), first published as
 [viktordanov/unreal-agent](https://github.com/viktordanov/unreal-agent). It
 keeps that project's architecture and license. The changes since then are
 request encoding and resume performance, custom tools with free-form input, and
-the wake policy. The `UNREAL_HARNESS_LLM_*` environment variables keep their
-original names for compatibility.
+the wake policy.
 
 ## Glossary
 

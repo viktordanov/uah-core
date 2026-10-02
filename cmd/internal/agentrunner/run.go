@@ -35,11 +35,11 @@ import (
 const (
 	defaultProvider           = "openai"
 	defaultSessionDirectory   = "uah-core/sessions"
-	llmAPIKeyEnvironment      = "UNREAL_HARNESS_LLM_API_KEY"
-	llmBaseURLEnvironment     = "UNREAL_HARNESS_LLM_BASE_URL"
-	llmModelEnvironment       = "UNREAL_HARNESS_LLM_MODEL"
-	llmProviderEnvironment    = "UNREAL_HARNESS_LLM_PROVIDER"
-	llmMaxAttemptsEnvironment = "UNREAL_HARNESS_LLM_MAX_ATTEMPTS"
+	llmAPIKeyEnvironment      = "UAH_LLM_API_KEY"
+	llmBaseURLEnvironment     = "UAH_LLM_BASE_URL"
+	llmModelEnvironment       = "UAH_LLM_MODEL"
+	llmProviderEnvironment    = "UAH_LLM_PROVIDER"
+	llmMaxAttemptsEnvironment = "UAH_LLM_MAX_ATTEMPTS"
 )
 
 const defaultSystemPrompt = `You are an AI agent running inside an isolated sandbox container.
