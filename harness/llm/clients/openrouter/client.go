@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/llm/responsesapi"
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm/responsesapi"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 type Config struct {

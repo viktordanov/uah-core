@@ -1,4 +1,4 @@
-module github.com/viktordanov/unreal-agent
+module github.com/viktordanov/uah-core
 
 go 1.27.0
 

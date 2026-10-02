@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/uah-core/harness/operation"
 )
 
 func TestLocalOperationManagerRunsShellOperation(t *testing.T) {

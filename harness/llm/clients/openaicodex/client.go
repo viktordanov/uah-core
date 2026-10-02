@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/llm/responsesapi"
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm/responsesapi"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 const BaseURL = "https://chatgpt.com/backend-api/codex"
@@ -56,8 +56,8 @@ func NewClient(config Config) (*Client, error) {
 			"Authorization":      {"Bearer " + credentials.accessToken},
 			"ChatGPT-Account-ID": {credentials.accountID},
 			"Content-Type":       {"application/json"},
-			"originator":         {"unreal-agent"},
-			"User-Agent":         {"unreal-agent"},
+			"originator":         {"uah-core"},
+			"User-Agent":         {"uah-core"},
 		},
 		CacheKeyPlacement: responsesapi.CacheKeyPlacement{UsePromptCacheKeyField: true, Header: "session-id"},
 		MaxAttempts:       config.MaxAttempts,

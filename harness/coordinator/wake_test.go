@@ -5,10 +5,10 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/operation"
-	"github.com/viktordanov/unreal-agent/harness/tool"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/operation"
+	"github.com/viktordanov/uah-core/harness/tool"
 )
 
 const stillRunningFiveMinutes = "Still running after 5 minutes. The call continues in the background, and its result arrives in a later turn.\nOutput so far:\npartial"

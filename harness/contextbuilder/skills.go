@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"strings"
 
-	"github.com/viktordanov/unreal-agent/harness/tool"
+	"github.com/viktordanov/uah-core/harness/tool"
 )
 
 //go:embed prompts/skill-preamble.md

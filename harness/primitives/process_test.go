@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 func startProcessWithAllPipes(ctx context.Context, request primitives.ProcessStartRequest) *processInvocation {

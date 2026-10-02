@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/operation"
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/operation"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 const testShellPath = "/bin/sh"

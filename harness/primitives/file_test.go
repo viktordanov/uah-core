@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/primitives"
 	"golang.org/x/sys/unix"
 )
 

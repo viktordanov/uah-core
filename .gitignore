@@ -4,16 +4,11 @@
 /.harness/
 /logs/
 /jobs/
-/benchmarks/harbor/jobs/
-/unreal-agent-runner
+/uah-core-runner
 /go.work
 /go.work.sum
 .env
 .env.*
 *.test
 coverage.out
-__pycache__/
-*.py[cod]
-.venv/
-.ruff_cache/
 .DS_Store

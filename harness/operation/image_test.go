@@ -22,7 +22,7 @@ import (
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/tiff"
 
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 func TestViewImageRecognizesFormatsFromContent(t *testing.T) {

@@ -9,12 +9,12 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/inbox"
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/operation"
-	"github.com/viktordanov/unreal-agent/harness/session"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/inbox"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/operation"
+	"github.com/viktordanov/uah-core/harness/session"
+	"github.com/viktordanov/uah-core/harness/sessionstore"
 )
 
 func TestCoordinatorStopCancelsShellProcess(t *testing.T) {

@@ -1,7 +1,7 @@
 .PHONY: build test check
 
 build:
-	go build -trimpath -o bin/unreal-agent-runner ./cmd/unreal-agent-runner
+	go build -trimpath -o bin/uah-core-runner ./cmd/uah-core-runner
 
 test:
 	go test -race ./...

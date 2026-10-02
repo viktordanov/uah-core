@@ -2,8 +2,8 @@
 package contextbuilder
 
 import (
-	"github.com/viktordanov/unreal-agent/harness/inbox"
-	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/uah-core/harness/inbox"
+	"github.com/viktordanov/uah-core/harness/llm"
 )
 
 type ChangeKind string

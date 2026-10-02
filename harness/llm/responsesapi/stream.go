@@ -14,7 +14,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 func (adapter *adapter) exchange(ctx context.Context, body []byte, cacheKey string) (int, []byte, error) {

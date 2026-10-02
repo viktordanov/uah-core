@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/uah-core/harness/operation"
 )
 
 // progressTail is how much of each stream Progress shows.

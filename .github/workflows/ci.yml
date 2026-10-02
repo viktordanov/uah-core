@@ -65,7 +65,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  harbor:
+  docker:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -74,18 +74,5 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: go.mod
-          cache: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: '3.12'
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-        with:
-          version: '0.12.17'
-          enable-cache: false
-      - run: make -C benchmarks/harbor test check build BUNDLE=../../bin/harbor/ci
-      - run: make -C benchmarks/harbor smoke BUNDLE=../../bin/harbor/ci
-      - run: docker build -t unreal-agent-ci .
-      - run: docker run --rm unreal-agent-ci -h
+      - run: docker build -t uah-core-ci .
+      - run: docker run --rm uah-core-ci -h

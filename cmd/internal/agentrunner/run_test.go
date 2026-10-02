@@ -17,10 +17,10 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/inbox"
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/inbox"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/sessionstore"
 )
 
 func TestRunMainExecutesBatchedMessages(t *testing.T) {
@@ -185,7 +185,7 @@ func TestRunMainUsesProviderAuthenticationConfiguration(t *testing.T) {
 					"CUSTOM_CREDENTIAL":    test.providerKey,
 					"CUSTOM_API_KEY":       "must-not-use",
 				}[name]
-			}, func() []string { return nil }, strings.NewReader(`{"prompt":"hello"}`), io.Discard, &stderr, Config{Name: "unreal-agent-runner", ParseRequest: parseTestRequest, Providers: providers})
+			}, func() []string { return nil }, strings.NewReader(`{"prompt":"hello"}`), io.Discard, &stderr, Config{Name: "uah-core-runner", ParseRequest: parseTestRequest, Providers: providers})
 			if test.wantError {
 				if code != 1 || created || !strings.Contains(stderr.String(), test.keyEnvironment) {
 					t.Fatalf("exit = %d, client created = %v, stderr = %s", code, created, stderr.String())
@@ -253,7 +253,7 @@ func TestRunMainUsesLLMConfigurationFromEnvironment(t *testing.T) {
 		}`),
 		&stdout,
 		&stderr,
-		Config{Name: "unreal-agent-runner", ParseRequest: parseTestRequest, Providers: providers},
+		Config{Name: "uah-core-runner", ParseRequest: parseTestRequest, Providers: providers},
 	)
 	if code != 0 || !selected {
 		t.Fatalf("exit = %d, selected = %t, stderr = %q", code, selected, stderr.String())
@@ -453,7 +453,7 @@ func (client *fakeClient) Close() error {
 }
 
 func testConfig(client Client) Config {
-	return Config{Name: "unreal-agent-runner", ParseRequest: parseTestRequest, Providers: []Provider{{
+	return Config{Name: "uah-core-runner", ParseRequest: parseTestRequest, Providers: []Provider{{
 		Name: "openai", BaseURL: "https://example.com",
 		DefaultModel:      "gpt-default",
 		APIKeyEnvironment: "OPENAI_API_KEY",
@@ -640,7 +640,7 @@ func TestRunMainUsesDefaultSessionDirectory(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
 	}
-	sessions := filepath.Join(stateHome, "unreal-agent", "sessions")
+	sessions := filepath.Join(stateHome, "uah-core", "sessions")
 	for pattern, wantContent := range map[string]string{
 		"*.session.jsonl": "model_response",
 		filepath.Join("operations", "*", "*", "out"): "hello",
@@ -667,11 +667,11 @@ func TestResolveSessionDirectory(t *testing.T) {
 	for _, test := range []struct {
 		name, configured, stateHome, userHome, want string
 	}{
-		{name: "XDG state home", stateHome: "/state", userHome: "/home/user", want: "/state/unreal-agent/sessions"},
-		{name: "XDG without home", stateHome: "/state", want: "/state/unreal-agent/sessions"},
-		{name: "home fallback", userHome: "/home/user", want: "/home/user/.local/state/unreal-agent/sessions"},
-		{name: "process home fallback", want: "/process/home/.local/state/unreal-agent/sessions"},
-		{name: "relative XDG ignored", stateHome: "relative/state", userHome: "/home/user", want: "/home/user/.local/state/unreal-agent/sessions"},
+		{name: "XDG state home", stateHome: "/state", userHome: "/home/user", want: "/state/uah-core/sessions"},
+		{name: "XDG without home", stateHome: "/state", want: "/state/uah-core/sessions"},
+		{name: "home fallback", userHome: "/home/user", want: "/home/user/.local/state/uah-core/sessions"},
+		{name: "process home fallback", want: "/process/home/.local/state/uah-core/sessions"},
+		{name: "relative XDG ignored", stateHome: "relative/state", userHome: "/home/user", want: "/home/user/.local/state/uah-core/sessions"},
 		{name: "absolute override", configured: " /sessions ", stateHome: "/state", userHome: "/home/user", want: "/sessions"},
 		{name: "relative override", configured: "sessions", stateHome: "/state", want: filepath.Join(workspace, "sessions")},
 		{name: "override without environment", configured: "/sessions", want: "/sessions"},

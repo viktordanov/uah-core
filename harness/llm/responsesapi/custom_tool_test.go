@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm"
 )
 
 const testPatch = "*** Begin Patch\n*** Add File: a.txt\n+say \"hi\"\n*** End Patch"

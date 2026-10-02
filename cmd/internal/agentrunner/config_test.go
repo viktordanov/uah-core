@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/tool"
+	"github.com/viktordanov/uah-core/harness/tool"
 )
 
 func TestRunRejectsIncompleteConfiguration(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 const (

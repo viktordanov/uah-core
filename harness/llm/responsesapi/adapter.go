@@ -12,8 +12,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 const remoteSource primitives.SourceID = "llm.responsesapi"

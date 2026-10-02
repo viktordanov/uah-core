@@ -17,10 +17,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/inbox"
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/inbox"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/sessionstore"
 )
 
 func TestRunMainHeartbeatReleasesWaitingBashAndReplays(t *testing.T) {
@@ -151,7 +151,7 @@ func TestRunMainRejectsInvalidHeartbeatInterval(t *testing.T) {
 			var stderr bytes.Buffer
 			code := RunMain(t.Context(), []string{"-tool-heartbeat-interval", interval},
 				func(string) string { return "" }, func() []string { return nil },
-				strings.NewReader(`{"prompt":"hello"}`), io.Discard, &stderr, Config{Name: "unreal-agent-runner", ParseRequest: parseTestRequest})
+				strings.NewReader(`{"prompt":"hello"}`), io.Discard, &stderr, Config{Name: "uah-core-runner", ParseRequest: parseTestRequest})
 			if code != 1 || !strings.Contains(stderr.String(), "heartbeat") {
 				t.Fatalf("exit = %d, stderr = %s", code, stderr.String())
 			}

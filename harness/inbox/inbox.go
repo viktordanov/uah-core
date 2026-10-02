@@ -7,7 +7,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm"
 )
 
 type ID string

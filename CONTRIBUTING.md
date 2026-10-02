@@ -1,7 +1,4 @@
-This repository contains selected components from a larger internal codebase.
+uah-core is the runtime of [uah](https://github.com/viktordanov/uah) and changes with it.
 
-We intend to share more components, features, and tools over time, as we evaluate their reliability, token usage, and impact on agent behavior.
-
-We welcome GitHub issues with your questions, feature requests, and bug reports.
-
-Unfortunately, we don't currently have the capacity to review and merge pull requests.
+Issues with questions, feature requests, and bug reports are welcome. Run
+`make test check build` before you open a pull request.

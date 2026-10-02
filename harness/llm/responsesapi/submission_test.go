@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/llm"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/llm"
 )
 
 func TestSubmittedPrefixAndLateResultOrderOnWire(t *testing.T) {

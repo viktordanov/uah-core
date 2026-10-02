@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/llm/responsesapi"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm/responsesapi"
 )
 
 func TestClientUsesSubscriptionProtocol(t *testing.T) {
@@ -24,7 +24,7 @@ func TestClientUsesSubscriptionProtocol(t *testing.T) {
 		if r.URL.Path != "/responses" || r.Method != "POST" {
 			t.Errorf("request = %s %s", r.Method, r.URL.Path)
 		}
-		for key, want := range map[string]string{"Authorization": "Bearer access-token", "ChatGPT-Account-ID": "account", "Accept": "text/event-stream", "Content-Type": "application/json", "originator": "unreal-agent"} {
+		for key, want := range map[string]string{"Authorization": "Bearer access-token", "ChatGPT-Account-ID": "account", "Accept": "text/event-stream", "Content-Type": "application/json", "originator": "uah-core"} {
 			if r.Header.Get(key) != want {
 				t.Errorf("incorrect %s header", key)
 			}

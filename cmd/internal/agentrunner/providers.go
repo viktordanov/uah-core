@@ -1,11 +1,11 @@
 package agentrunner
 
 import (
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/fireworks"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/ollama"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/openai"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/openaicodex"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/openrouter"
+	"github.com/viktordanov/uah-core/harness/llm/clients/fireworks"
+	"github.com/viktordanov/uah-core/harness/llm/clients/ollama"
+	"github.com/viktordanov/uah-core/harness/llm/clients/openai"
+	"github.com/viktordanov/uah-core/harness/llm/clients/openaicodex"
+	"github.com/viktordanov/uah-core/harness/llm/clients/openrouter"
 )
 
 func DefaultProviders() []Provider {

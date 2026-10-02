@@ -18,23 +18,23 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/coordinator"
-	"github.com/viktordanov/unreal-agent/harness/inbox"
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/llm/responsesapi"
-	"github.com/viktordanov/unreal-agent/harness/operation"
-	"github.com/viktordanov/unreal-agent/harness/session"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore/localfile"
-	"github.com/viktordanov/unreal-agent/harness/tool"
-	"github.com/viktordanov/unreal-agent/harness/tool/bash"
-	"github.com/viktordanov/unreal-agent/harness/tool/viewimage"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/coordinator"
+	"github.com/viktordanov/uah-core/harness/inbox"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm/responsesapi"
+	"github.com/viktordanov/uah-core/harness/operation"
+	"github.com/viktordanov/uah-core/harness/session"
+	"github.com/viktordanov/uah-core/harness/sessionstore"
+	"github.com/viktordanov/uah-core/harness/sessionstore/localfile"
+	"github.com/viktordanov/uah-core/harness/tool"
+	"github.com/viktordanov/uah-core/harness/tool/bash"
+	"github.com/viktordanov/uah-core/harness/tool/viewimage"
 )
 
 const (
 	defaultProvider           = "openai"
-	defaultSessionDirectory   = "unreal-agent/sessions"
+	defaultSessionDirectory   = "uah-core/sessions"
 	llmAPIKeyEnvironment      = "UNREAL_HARNESS_LLM_API_KEY"
 	llmBaseURLEnvironment     = "UNREAL_HARNESS_LLM_BASE_URL"
 	llmModelEnvironment       = "UNREAL_HARNESS_LLM_MODEL"
@@ -168,7 +168,7 @@ func Run(
 		prompt = &value
 		return nil
 	})
-	sessionDirectory := flags.String("session-directory", "", "directory containing session files; defaults to $XDG_STATE_HOME/unreal-agent/sessions, or $HOME/.local/state/unreal-agent/sessions")
+	sessionDirectory := flags.String("session-directory", "", "directory containing session files; defaults to $XDG_STATE_HOME/uah-core/sessions, or $HOME/.local/state/uah-core/sessions")
 	workspaceDirectory := flags.String("workspace", ".", "agent workspace and Bash working directory")
 	logDirectory := flags.String("log-directory", "", "optional session JSONL log directory; unset writes only to stdout")
 	toolHeartbeatInterval := flags.Duration("tool-heartbeat-interval", 10*time.Minute, "tool-wait heartbeat interval (0 disables)")

@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/fireworks"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/openai"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/openaicodex"
-	"github.com/viktordanov/unreal-agent/harness/llm/clients/openrouter"
-	"github.com/viktordanov/unreal-agent/harness/llm/responsesapi"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/llm/clients/fireworks"
+	"github.com/viktordanov/uah-core/harness/llm/clients/openai"
+	"github.com/viktordanov/uah-core/harness/llm/clients/openaicodex"
+	"github.com/viktordanov/uah-core/harness/llm/clients/openrouter"
+	"github.com/viktordanov/uah-core/harness/llm/responsesapi"
 )
 
 type streamingClient interface {

@@ -4,12 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/contextbuilder"
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/operation"
-	"github.com/viktordanov/unreal-agent/harness/session"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore"
-	"github.com/viktordanov/unreal-agent/harness/sessionstore/localfile"
+	"github.com/viktordanov/uah-core/harness/contextbuilder"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/operation"
+	"github.com/viktordanov/uah-core/harness/session"
+	"github.com/viktordanov/uah-core/harness/sessionstore"
+	"github.com/viktordanov/uah-core/harness/sessionstore/localfile"
 )
 
 func TestCoordinatorReplaysToolResultBalance(t *testing.T) {

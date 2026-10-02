@@ -5,8 +5,8 @@ import (
 	"testing"
 	"uuid"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/operation"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/operation"
 )
 
 type fixedTranslator struct {

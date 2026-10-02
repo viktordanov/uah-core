@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/viktordanov/unreal-agent/harness/operation"
-	"github.com/viktordanov/unreal-agent/harness/tool/bash"
+	"github.com/viktordanov/uah-core/harness/operation"
+	"github.com/viktordanov/uah-core/harness/tool/bash"
 )
 
 func TestProgressShowsCapturedOutputSoFar(t *testing.T) {

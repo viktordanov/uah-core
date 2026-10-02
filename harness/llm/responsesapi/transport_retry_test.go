@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/viktordanov/unreal-agent/harness/llm"
-	"github.com/viktordanov/unreal-agent/harness/primitives"
+	"github.com/viktordanov/uah-core/harness/llm"
+	"github.com/viktordanov/uah-core/harness/primitives"
 )
 
 func TestExchangeRetriesHeaderTimeout(t *testing.T) {
