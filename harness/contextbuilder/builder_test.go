@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/viktordanov/unreal-agent/harness/inbox"
 	"github.com/viktordanov/unreal-agent/harness/llm"
@@ -304,46 +303,4 @@ Be concise.`
 	if got := result.Request.Input[0].Data.(llm.Message).Text; got != want {
 		t.Fatalf("system prompt = %q, want %q", got, want)
 	}
-}
-
-func TestBuilderHeldPreambleDescribesTheHold(t *testing.T) {
-	current := NewBuilderWithOptions(Options{Hold: 5 * time.Minute})
-	result, err := current.Build()
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := result.Request.Input[0].Data.(llm.Message).Text
-	for _, want := range []string{
-		"Their results arrive together",
-		"A call still running after 5 minutes wakes you with its output so far",
-		"you wait for them: you sleep until they finish, or until one has run for 5 minutes",
-		"Treat the prompt as a goal",
-	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("held preamble lacks %q:\n%s", want, text)
-		}
-	}
-	for _, gone := range []string{"placeholder", "{{hold}}", "wakes a new turn"} {
-		if strings.Contains(text, gone) {
-			t.Errorf("held preamble still says %q", gone)
-		}
-	}
-	if got := NewBuilderWithOptions(Options{}); !reflect.DeepEqual(mustBuild(t, got).Input, withPreamble()) {
-		t.Error("zero options changed the preamble")
-	}
-	if got := holdText(90 * time.Second); got != "90 seconds" {
-		t.Errorf("holdText(90s) = %q", got)
-	}
-	if got := holdText(time.Minute); got != "1 minute" {
-		t.Errorf("holdText(1m) = %q", got)
-	}
-}
-
-func mustBuild(t *testing.T, current Builder) llm.Request {
-	t.Helper()
-	result, err := current.Build()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result.Request
 }

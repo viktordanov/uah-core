@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/viktordanov/unreal-agent/harness/inbox"
 	"github.com/viktordanov/unreal-agent/harness/llm"
@@ -21,37 +20,6 @@ var preambleFile string
 
 var preamble = strings.TrimSpace(preambleFile)
 
-//go:embed prompts/preamble-held.md
-var heldPreambleFile string
-
-// Options change the preamble a builder starts with.
-type Options struct {
-	// Hold, when set, is the coordinator's WakePolicy.Hold: the preamble then
-	// says that a turn's results arrive together once its calls finish, and
-	// that a call still running after Hold wakes the model with its output so
-	// far, instead of describing a wake for each result.
-	Hold time.Duration
-}
-
-func (opts Options) preamble() string {
-	if opts.Hold <= 0 {
-		return preamble
-	}
-	return strings.ReplaceAll(strings.TrimSpace(heldPreambleFile), "{{hold}}", holdText(opts.Hold))
-}
-
-// holdText writes a hold as the preamble reads it: "5 minutes", "90 seconds".
-func holdText(d time.Duration) string {
-	unit, size := "second", time.Second
-	if d%time.Minute == 0 {
-		unit, size = "minute", time.Minute
-	}
-	if n := d / size; n != 1 {
-		return fmt.Sprintf("%d %ss", n, unit)
-	}
-	return "1 " + unit
-}
-
 type builder struct {
 	request         llm.Request
 	preamble        string
@@ -63,12 +31,7 @@ type builder struct {
 var _ Builder = (*builder)(nil)
 
 func NewBuilder(skills ...tool.Skill) Builder {
-	return NewBuilderWithOptions(Options{}, skills...)
-}
-
-// NewBuilderWithOptions is NewBuilder with the preamble the options choose.
-func NewBuilderWithOptions(opts Options, skills ...tool.Skill) Builder {
-	currentPreamble := opts.preamble()
+	currentPreamble := preamble
 	if skillPrompt := formatSkillsForPrompt(skills); skillPrompt != "" {
 		currentPreamble += "\n\n" + skillPrompt
 	}
