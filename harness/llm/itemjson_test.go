@@ -35,6 +35,7 @@ func TestItemJSONRoundTrip(t *testing.T) {
 			Summary: []string{"inspect"}, Raw: jsontext.Value(`{"encrypted":"opaque"}`),
 		}},
 		{ProviderID: "reasoning-empty", Type: ItemReasoning, Data: Reasoning{}},
+		{Type: ItemConfigurationUpdate, Data: ConfigurationUpdate{ReasoningEffort: ReasoningEffortLow}},
 	}
 
 	for _, want := range tests {

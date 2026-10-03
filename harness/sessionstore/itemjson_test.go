@@ -27,6 +27,7 @@ func TestItemJSONRoundTrip(t *testing.T) {
 		}},
 		{Sequence: 1, RecordedAt: recordedAt, Kind: ItemTurn, Data: session.Turn{ID: "turn-1", Type: session.TurnRegular}},
 		{Sequence: 1, RecordedAt: recordedAt, Kind: ItemTurn, Data: session.Turn{ID: "turn-1", Type: session.TurnCompaction}},
+		{Sequence: 1, RecordedAt: recordedAt, Kind: ItemTurn, Data: session.Turn{ID: "turn-1", Type: session.TurnRegular, EffortUpdate: llm.ReasoningEffortLow}},
 		{Sequence: 1, RecordedAt: recordedAt, Kind: ItemModelResponse, Data: ModelResponse{
 			TurnID: "turn-1",
 			Response: llm.Response{Output: []llm.Item{{

@@ -1,7 +1,11 @@
 // Package session defines durable session and turn identity.
 package session
 
-import "time"
+import (
+	"time"
+
+	"github.com/viktordanov/uah-core/harness/llm"
+)
 
 type ID string
 
@@ -23,4 +27,8 @@ type Turn struct {
 	ID             TurnID
 	PreviousTurnID TurnID
 	Type           TurnType
+	// EffortUpdate is the effort the turn's request set with a
+	// configuration update (llm.ItemConfigurationUpdate), which goes in the
+	// history after the inputs the request answers; empty when it set none.
+	EffortUpdate llm.ReasoningEffort `json:",omitzero"`
 }

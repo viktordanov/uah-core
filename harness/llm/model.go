@@ -1,6 +1,9 @@
 package llm
 
-import "encoding/json/jsontext"
+import (
+	"encoding/json/jsontext"
+	"slices"
+)
 
 type Role string
 
@@ -20,6 +23,10 @@ const (
 	ItemToolCall   ItemType = "tool_call"
 	ItemToolResult ItemType = "tool_result"
 	ItemReasoning  ItemType = "reasoning"
+	// ItemConfigurationUpdate changes the request's settings from its place
+	// in the input on, as Codex's configuration_update item does. The
+	// request keeps its own settings, so a change keeps the prompt cache.
+	ItemConfigurationUpdate ItemType = "configuration_update"
 )
 
 type Item struct {
@@ -66,6 +73,12 @@ type ToolResult struct {
 type Reasoning struct {
 	Summary []string       `json:",omitzero"`
 	Raw     jsontext.Value `json:",omitzero"`
+}
+
+// ConfigurationUpdate is the data of an ItemConfigurationUpdate: the effort
+// the model reasons at from the item on.
+type ConfigurationUpdate struct {
+	ReasoningEffort ReasoningEffort
 }
 
 type ToolType string
@@ -143,6 +156,32 @@ type Request struct {
 	Model Model
 	Input []Item
 	Tools []Tool
+}
+
+// Effort is the effort the model reasons at for the request: the last
+// configuration update's in the input, else the request's.
+func (request Request) Effort() ReasoningEffort {
+	for _, item := range slices.Backward(request.Input) {
+		if update, ok := item.Data.(ConfigurationUpdate); ok && item.Type == ItemConfigurationUpdate {
+			return update.ReasoningEffort
+		}
+	}
+	return request.Model.ReasoningEffort
+}
+
+// WithoutConfigurationUpdates is the request without its configuration
+// updates, for a provider or model that does not take them. It keeps the
+// request's effort; Effort is the one the updates set. The input is copied
+// only when it has an update.
+func (request Request) WithoutConfigurationUpdates() Request {
+	if slices.ContainsFunc(request.Input, isConfigurationUpdate) {
+		request.Input = slices.DeleteFunc(slices.Clone(request.Input), isConfigurationUpdate)
+	}
+	return request
+}
+
+func isConfigurationUpdate(item Item) bool {
+	return item.Type == ItemConfigurationUpdate
 }
 
 type StopReason string

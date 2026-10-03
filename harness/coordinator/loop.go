@@ -459,12 +459,23 @@ func (current *coordinator) requestModelResponse(
 		PreviousTurnID: current.state.currentTurnID,
 		Type:           session.TurnRegular,
 	}
+	if update := current.dependencies.EffortUpdate; update != nil {
+		turn.EffortUpdate = update(built.Request)
+		if turn.EffortUpdate != "" && !turn.EffortUpdate.Valid() {
+			return fmt.Errorf("effort update %q is not a reasoning effort", turn.EffortUpdate)
+		}
+	}
 	item, err := current.addItemToLocalState(sessionstore.Item{
 		Kind: sessionstore.ItemTurn,
 		Data: turn,
 	})
 	if err != nil {
 		return err
+	}
+	if turn.EffortUpdate != "" {
+		if built, err = current.dependencies.ContextBuilder.Build(); err != nil {
+			return fmt.Errorf("build model request: %w", err)
+		}
 	}
 	if err := current.storeItemInSessionStore(ctx, item); err != nil {
 		return err
@@ -704,6 +715,9 @@ func (current *coordinator) addItemToLocalState(
 		current.state.currentTurnID = turn.ID
 		current.state.currentTurnType = turn.Type
 		current.state.currentTurnInputs = current.state.availableInputs
+		if turn.EffortUpdate != "" {
+			current.dependencies.ContextBuilder.AddConfigurationUpdate(turn.EffortUpdate)
+		}
 		current.dependencies.ContextBuilder.Commit()
 
 	case sessionstore.ItemModelResponse:
