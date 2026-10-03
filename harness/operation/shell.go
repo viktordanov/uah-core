@@ -51,22 +51,27 @@ type ShellState struct {
 	Input         ShellInput
 	BaseDirectory string
 
-	Phase           ShellPhase
-	ProcessGroupID  int
-	PendingExitCode *int
-	OutSize         int64
-	ErrSize         int64
-	InlineOut       []byte
-	InlineErr       []byte
-	InlineOutTail   []byte
-	InlineErrTail   []byte
-	Result          *ShellResult
-	TerminalError   string
-	ErrorTruncated  bool
-	OutTruncated    bool
-	ErrTruncated    bool
-	OutPath         string
-	ErrPath         string
+	Phase          ShellPhase
+	ProcessGroupID int
+	// ProcessGroupStart identifies the group's leader beyond its PID
+	// (primitives.ProcessStartedResult.Start). A harness that kills the
+	// recorded group after a crash compares it first, so that it never
+	// signals a group that reuses the ID.
+	ProcessGroupStart string
+	PendingExitCode   *int
+	OutSize           int64
+	ErrSize           int64
+	InlineOut         []byte
+	InlineErr         []byte
+	InlineOutTail     []byte
+	InlineErrTail     []byte
+	Result            *ShellResult
+	TerminalError     string
+	ErrorTruncated    bool
+	OutTruncated      bool
+	ErrTruncated      bool
+	OutPath           string
+	ErrPath           string
 }
 
 type Shell struct {
@@ -315,7 +320,7 @@ func (shell *Shell) processEvent(event primitives.PrimitiveEvent, paths shellPat
 		if !ok || started.PID <= 1 {
 			return shell.fail(errors.New("start shell returned an invalid result"))
 		}
-		state.ProcessGroupID = started.PID
+		state.ProcessGroupID, state.ProcessGroupStart = started.PID, started.Start
 		return shell.await()
 
 	case primitives.PrimitiveEventProcessExited:
@@ -324,7 +329,7 @@ func (shell *Shell) processEvent(event primitives.PrimitiveEvent, paths shellPat
 			return shell.fail(errors.New("shell returned an invalid exit result"))
 		}
 		exitCode := shellExitStatus(exit)
-		state.ProcessGroupID = 0
+		state.ProcessGroupID, state.ProcessGroupStart = 0, ""
 		state.PendingExitCode = &exitCode
 		return shell.next(ShellPhaseReadOut, paths)
 

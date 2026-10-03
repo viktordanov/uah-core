@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/viktordanov/uah-core/internal/procstart"
 )
 
 const (
@@ -60,6 +62,10 @@ const (
 
 type ProcessStartedResult struct {
 	PID int
+	// Start identifies the process beyond its PID (procstart.Of), so that a
+	// later reader of a recorded PID can tell a reused one apart. It is
+	// empty if it could not be read.
+	Start string
 }
 
 type ProcessStream int
@@ -367,6 +373,8 @@ func runProcess(
 		return
 	}
 
+	// The child is not reaped before Wait, so its PID still names it here.
+	start, _ := procstart.Of(command.Process.Pid)
 	parentPipes := pipes.parent()
 	process.process = command.Process
 	process.stdin = parentPipes.stdin
@@ -377,7 +385,7 @@ func runProcess(
 		Type:          PrimitiveEventProcessStarted,
 		Source:        request.Source,
 		CorrelationID: request.CorrelationID,
-		Result:        ProcessStartedResult{PID: command.Process.Pid},
+		Result:        ProcessStartedResult{PID: command.Process.Pid, Start: start},
 	})
 
 	waitCompleted := make(chan error, 1)

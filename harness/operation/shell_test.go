@@ -14,6 +14,7 @@ import (
 
 	"github.com/viktordanov/uah-core/harness/operation"
 	"github.com/viktordanov/uah-core/harness/primitives"
+	"github.com/viktordanov/uah-core/internal/procstart"
 )
 
 const testShellPath = "/bin/sh"
@@ -126,8 +127,9 @@ func TestShellActorPersistsSignalExitStatusBeforeReading(t *testing.T) {
 		Input:         operation.ShellInput{Shell: testShellPath},
 		BaseDirectory: baseDirectory,
 
-		Phase:          operation.ShellPhaseProcess,
-		ProcessGroupID: 4321,
+		Phase:             operation.ShellPhaseProcess,
+		ProcessGroupID:    4321,
+		ProcessGroupStart: "boot/1",
 	})
 	event := primitives.PrimitiveEvent{
 		Type:          primitives.PrimitiveEventProcessExited,
@@ -145,7 +147,7 @@ func TestShellActorPersistsSignalExitStatusBeforeReading(t *testing.T) {
 		t.Fatalf("read request = %#v", request)
 	}
 	state := shellState(t, *step.Operation)
-	if state.Phase != operation.ShellPhaseReadOut || state.ProcessGroupID != 0 ||
+	if state.Phase != operation.ShellPhaseReadOut || state.ProcessGroupID != 0 || state.ProcessGroupStart != "" ||
 		state.PendingExitCode == nil || *state.PendingExitCode != 143 {
 		t.Fatalf("state = %#v", state)
 	}
@@ -175,8 +177,9 @@ func TestShellActorPreservesRecordedProcessWhenFailingRecovery(t *testing.T) {
 		Input:         operation.ShellInput{Shell: testShellPath},
 		BaseDirectory: t.TempDir(),
 
-		Phase:          operation.ShellPhaseProcess,
-		ProcessGroupID: 4321,
+		Phase:             operation.ShellPhaseProcess,
+		ProcessGroupID:    4321,
+		ProcessGroupStart: "boot/1",
 	})
 
 	step, err := advanceShellOnce(t, current, nil)
@@ -185,7 +188,7 @@ func TestShellActorPreservesRecordedProcessWhenFailingRecovery(t *testing.T) {
 	}
 	state := shellState(t, *step.Operation)
 	if step.Operation.Status != operation.StatusFailed || len(step.Dispatches) != 0 ||
-		state.ProcessGroupID != 4321 ||
+		state.ProcessGroupID != 4321 || state.ProcessGroupStart != "boot/1" ||
 		!strings.Contains(state.TerminalError, "interrupted before an exit status") {
 		t.Fatalf("step = %#v, state = %#v", step, state)
 	}
@@ -478,6 +481,13 @@ func TestShellActorCancellationStopsActiveProcess(t *testing.T) {
 		processGroupID = started.PID
 		if state := shellState(t, current); state.ProcessGroupID != processGroupID {
 			t.Fatalf("state process group = %d, want %d", state.ProcessGroupID, processGroupID)
+		}
+		// The leader still runs: the recorded start must be its identity.
+		if want, err := procstart.Of(started.PID); err != nil || started.Start != want {
+			t.Fatalf("started.Start = %q, want %q (%v)", started.Start, want, err)
+		}
+		if state := shellState(t, current); state.ProcessGroupStart != started.Start {
+			t.Fatalf("state process group start = %q, want %q", state.ProcessGroupStart, started.Start)
 		}
 		cancel()
 	})
