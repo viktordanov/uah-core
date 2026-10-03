@@ -8,6 +8,9 @@ const (
 	RoleUser      Role = "user"
 	RoleAssistant Role = "assistant"
 	RoleSystem    Role = "system"
+	// RoleDeveloper marks instructions from the harness rather than the user,
+	// such as the context it prepares for a new session.
+	RoleDeveloper Role = "developer"
 )
 
 type ItemType string

@@ -71,6 +71,35 @@ func TestRunMainRequestSources(t *testing.T) {
 	}
 }
 
+func TestRunMainSendsDeveloperMessages(t *testing.T) {
+	var got []llm.Message
+	client := &fakeClient{respond: func(_ context.Context, request llm.Request) (llm.Response, error) {
+		for _, item := range request.Input[1:] {
+			got = append(got, item.Data.(llm.Message))
+		}
+		return llm.Response{ID: "done", Stop: llm.StopComplete}, nil
+	}}
+	args := []string{"-workspace", t.TempDir(), "-session-directory", t.TempDir(),
+		`{"messages":[{"role":"developer","content":"context"},{"role":"user","content":"hello"}]}`}
+	var stdout, stderr bytes.Buffer
+	code := RunMain(t.Context(), args, func(name string) string {
+		if name == llmAPIKeyEnvironment {
+			return "secret"
+		}
+		return ""
+	}, func() []string { return nil }, iotest.ErrReader(errors.New("stdin must not be read")), &stdout, &stderr, testConfig(client))
+	if code != 0 {
+		t.Fatalf("exit = %d, stderr = %s", code, stderr.String())
+	}
+	want := []llm.Message{{Role: llm.RoleDeveloper, Text: "context"}, {Role: llm.RoleUser, Text: "hello"}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("messages = %#v, want %#v", got, want)
+	}
+	if !strings.Contains(stdout.String(), `"Kind":"developer"`) {
+		t.Fatalf("stdout does not record the developer input: %s", stdout.String())
+	}
+}
+
 func TestRunMainRejectsInvalidRequestArguments(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -85,6 +114,8 @@ func TestRunMainRejectsInvalidRequestArguments(t *testing.T) {
 		{name: "unknown field", args: []string{`{"prompt":"hello","unknown":true}`}, want: "unknown object member"},
 		{name: "empty argument", args: []string{""}, want: "empty input"},
 		{name: "invalid request", args: []string{`{"messages":[]}`}, want: "messages must not be empty"},
+		{name: "unknown role", args: []string{`{"messages":[{"role":"system","content":"x"}]}`}, want: "messages[0].role must be user or developer"},
+		{name: "developer only", args: []string{`{"messages":[{"role":"developer","content":"x"}]}`}, want: "messages must include a user message"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer

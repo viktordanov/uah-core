@@ -76,8 +76,10 @@ type Page struct {
 }
 
 type ResumeState struct {
-	Snapshot         Snapshot
-	Operations       []operation.Operation // Unfinished operations and terminal states missing from tool-call history.
+	Snapshot   Snapshot
+	Operations []operation.Operation // Unfinished operations and terminal states missing from tool-call history.
+	// ExternalInputIDs are the IDs of the recorded external and developer
+	// inputs, which the inbox ignores when they are submitted again.
 	ExternalInputIDs []inbox.ID
 }
 

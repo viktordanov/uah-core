@@ -29,6 +29,7 @@ func TestRequestBodyMatchesLegacyEncoding(t *testing.T) {
 	}
 	history := []llm.Item{
 		{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleSystem, Text: "System <rules> & \"quotes\"\n\t\u2029"}},
+		{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleDeveloper, Text: "<context_preparation>\n</context_preparation>"}},
 		{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleUser, Text: "héllo 👋 \\ \u0000 </script>"}},
 		{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleUser, Text: "steer", Phase: "commentary"}},
 		{ProviderID: "msg_0", Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleUser, Text: "identified <user>"}},

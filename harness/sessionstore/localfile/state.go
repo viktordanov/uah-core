@@ -290,7 +290,7 @@ func (state storedState) resume() sessionstore.ResumeState {
 		switch item.Kind {
 		case sessionstore.ItemInput:
 			input := item.Data.(inbox.Input)
-			if input.Kind == inbox.InputExternal {
+			if input.Kind == inbox.InputExternal || input.Kind == inbox.InputDeveloper {
 				externalInputIDs = append(externalInputIDs, input.ID)
 			}
 		case sessionstore.ItemToolCallStatus:

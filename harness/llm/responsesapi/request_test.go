@@ -216,7 +216,7 @@ func TestRequestBodyRejectsInvalidItemPayloads(t *testing.T) {
 }
 
 func TestRequestInputItemPreservesIdentifiedInputMessageRoles(t *testing.T) {
-	roles := []llm.Role{llm.RoleUser, llm.RoleSystem}
+	roles := []llm.Role{llm.RoleUser, llm.RoleSystem, llm.RoleDeveloper}
 	for _, role := range roles {
 		t.Run(string(role), func(t *testing.T) {
 			item, err := requestInputItem(llm.Item{
@@ -251,6 +251,32 @@ func TestRequestInputItemPreservesIdentifiedInputMessageRoles(t *testing.T) {
 				t.Fatalf("content = %#v", got.Content)
 			}
 		})
+	}
+}
+
+func TestRequestBodyEncodesDeveloperMessage(t *testing.T) {
+	body, err := requestBody(llm.Request{Input: []llm.Item{
+		{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleDeveloper, Text: "context"}},
+		{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleUser, Text: "hello"}},
+	}}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Input []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"input"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	}{{Role: "developer", Content: "context"}, {Role: "user", Content: "hello"}}
+	if !reflect.DeepEqual(got.Input, want) {
+		t.Fatalf("input = %+v, want %+v", got.Input, want)
 	}
 }
 

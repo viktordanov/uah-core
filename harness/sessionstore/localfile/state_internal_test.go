@@ -100,6 +100,7 @@ func TestResumeReturnsOnlyExternalInputIDs(t *testing.T) {
 		{ID: "external-1", Kind: inbox.InputExternal},
 		{ID: "control-1", Kind: inbox.InputControl, Payload: []byte(`{"Mode":"hard"}`)},
 		{ID: "crash-1", Kind: inbox.InputCrash},
+		{ID: "developer-1", Kind: inbox.InputDeveloper},
 		{ID: "external-2", Kind: inbox.InputExternal},
 	} {
 		if err := state.appendInput(input, stateUpdatedAt); err != nil {
@@ -109,7 +110,7 @@ func TestResumeReturnsOnlyExternalInputIDs(t *testing.T) {
 
 	if got := state.resume().ExternalInputIDs; !reflect.DeepEqual(
 		got,
-		[]inbox.ID{"external-1", "external-2"},
+		[]inbox.ID{"external-1", "developer-1", "external-2"},
 	) {
 		t.Fatalf("external input IDs = %#v", got)
 	}

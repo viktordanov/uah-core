@@ -30,6 +30,7 @@ func TestInboxOutputsEveryInputKind(t *testing.T) {
 	inputs := newInbox(t)
 	want := []inbox.Input{
 		{ID: "external", Kind: inbox.InputExternal},
+		{ID: "developer", Kind: inbox.InputDeveloper, Payload: jsontext.Value(`"context"`)},
 		{ID: "control", Kind: inbox.InputControl, Payload: jsontext.Value(`{"Mode":"hard"}`)},
 		{ID: "crash", Kind: inbox.InputCrash},
 	}
