@@ -40,8 +40,15 @@ func NewBuilder(skills ...tool.Skill) Builder {
 	return current
 }
 
+// AddExternalInput adds a user message, or a developer message for an
+// InputDeveloper input.
 func (current *builder) AddExternalInput(input inbox.Input) error {
-	if input.Kind != inbox.InputExternal {
+	role := llm.RoleUser
+	switch input.Kind {
+	case inbox.InputExternal:
+	case inbox.InputDeveloper:
+		role = llm.RoleDeveloper
+	default:
 		return fmt.Errorf(
 			"external input %q has input kind %q",
 			input.ID,
@@ -55,7 +62,7 @@ func (current *builder) AddExternalInput(input inbox.Input) error {
 	}
 	current.stagedSuffix = append(current.stagedSuffix, llm.Item{
 		Type: llm.ItemMessage,
-		Data: llm.Message{Role: llm.RoleUser, Text: text},
+		Data: llm.Message{Role: role, Text: text},
 	})
 	return nil
 }

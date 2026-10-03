@@ -668,7 +668,7 @@ func (current *coordinator) addItemToLocalState(
 		if err := input.Validate(); err != nil {
 			return sessionstore.Item{}, fmt.Errorf("invalid input: %w", err)
 		}
-		if input.Kind == inbox.InputExternal {
+		if input.Kind == inbox.InputExternal || input.Kind == inbox.InputDeveloper {
 			if err := current.dependencies.ContextBuilder.AddExternalInput(input); err != nil {
 				return sessionstore.Item{}, fmt.Errorf(
 					"add input %q to context: %w",
@@ -676,6 +676,10 @@ func (current *coordinator) addItemToLocalState(
 					err,
 				)
 			}
+		}
+		// A developer message waits for the next request; it does not
+		// request one.
+		if input.Kind == inbox.InputExternal {
 			current.state.availableInputs++
 		}
 		if input.Kind == inbox.InputControl {

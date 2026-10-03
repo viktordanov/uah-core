@@ -7,9 +7,10 @@ import (
 
 const requestHelp = `
 Request schema (JSON object; unknown fields are rejected):
-  messages: array of {role: "user", content: string, message_id?: UUID string}
-    Non-empty array of user messages delivered in order. role defaults to "user";
-    message_id defaults to a generated UUID.
+  messages: array of {role: "user" | "developer", content: string, message_id?: UUID string}
+    Messages delivered in order; at least one is a user message. role defaults to "user".
+    A developer message is the harness's, not the user's: it goes to the model as a
+    developer message with the next request. message_id defaults to a generated UUID.
   prompt: string
     Shorthand for one user message; used when messages is absent.
     Supply messages or prompt. messages takes precedence when both are present.

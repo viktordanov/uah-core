@@ -31,6 +31,8 @@ type Result struct {
 
 // Builder retains model request state without performing I/O.
 type Builder interface {
+	// AddExternalInput adds an InputExternal input as a user message and an
+	// InputDeveloper input as a developer message.
 	AddExternalInput(inbox.Input) error
 	AddControlMessage(inbox.ControlMessage)
 	SetModel(llm.Model)

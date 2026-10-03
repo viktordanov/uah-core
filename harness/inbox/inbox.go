@@ -16,8 +16,12 @@ type InputKind string
 
 const (
 	InputExternal InputKind = "external"
-	InputControl  InputKind = "control"
-	InputCrash    InputKind = "crash"
+	// InputDeveloper is a developer message from the harness, with a JSON
+	// string payload like InputExternal. It goes to the model with the next
+	// request but does not request one itself.
+	InputDeveloper InputKind = "developer"
+	InputControl   InputKind = "control"
+	InputCrash     InputKind = "crash"
 )
 
 type Input struct {
@@ -31,7 +35,7 @@ func (input Input) Validate() error {
 		return fmt.Errorf("input ID is empty")
 	}
 	switch input.Kind {
-	case InputExternal, InputCrash:
+	case InputExternal, InputDeveloper, InputCrash:
 	case InputControl:
 		if _, err := input.DecodeControlMessage(); err != nil {
 			return err

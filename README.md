@@ -15,6 +15,11 @@ asynchronous and durable:
   providers (OpenAI, the ChatGPT Codex backend, OpenRouter, Fireworks, Ollama).
   It encodes request history once and reuses it across requests, and it
   supports custom tools with free-form input.
+- **Developer messages.** An `inbox.InputDeveloper` input is the harness's
+  own message, such as context it prepares for a session. It is recorded,
+  resumed, and forked like a user message and goes to the model as a
+  `developer` role message, but it does not request a model response: it goes
+  with the next request.
 - **Wake policy.** `coordinator.WakePolicy` can hold a turn's results so the
   model wakes once with all of them, and opens a valve with the output so far
   of a call that runs past the hold.
@@ -39,8 +44,8 @@ the wake policy.
 
 - **Input**: an event with a caller-supplied globally unique ID that remains
   stable across redeliveries.
-- **Inbox**: session-scoped, in-memory deduplication of external, control, and
-  crash inputs.
+- **Inbox**: session-scoped, in-memory deduplication of external (user),
+  developer, control, and crash inputs.
 - **Session**: append-only persisted history that can be forked.
 - **LLM turn**: the coordinator-managed sequence around one logical LLM request.
 - **Tool**: a capability described by a schema and bound to a translator.

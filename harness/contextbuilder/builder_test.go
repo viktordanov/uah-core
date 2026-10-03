@@ -46,6 +46,29 @@ func TestBuilderAddsExternalInputAsUserMessage(t *testing.T) {
 	}
 }
 
+func TestBuilderAddsDeveloperInputAsDeveloperMessage(t *testing.T) {
+	current := NewBuilder()
+	if err := current.AddExternalInput(inbox.Input{
+		ID:      "input-1",
+		Kind:    inbox.InputDeveloper,
+		Payload: []byte(`"Context"`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := current.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := withPreamble(llm.Item{
+		Type: llm.ItemMessage,
+		Data: llm.Message{Role: llm.RoleDeveloper, Text: "Context"},
+	})
+	if !reflect.DeepEqual(result.Request.Input, want) {
+		t.Fatalf("input = %#v, want %#v", result.Request.Input, want)
+	}
+}
+
 func TestBuilderRejectsInvalidExternalInput(t *testing.T) {
 	tests := []struct {
 		name  string

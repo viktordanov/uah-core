@@ -390,8 +390,12 @@ func Run(
 		} else {
 			messageID = inbox.ID(uuid.New().String())
 		}
+		kind := inbox.InputExternal
+		if message.Role == "developer" {
+			kind = inbox.InputDeveloper
+		}
 		if err := inputs.Submit(runContext, inbox.Input{
-			ID: messageID, Kind: inbox.InputExternal, Payload: payload,
+			ID: messageID, Kind: kind, Payload: payload,
 		}); err != nil {
 			return fmt.Errorf("submit message %d: %w", index, err)
 		}
@@ -630,9 +634,14 @@ func validateRequest(parsed Request) ([]RequestMessage, error) {
 	if len(parsed.Messages) == 0 {
 		return nil, errors.New("messages must not be empty")
 	}
+	users := 0
 	for index, message := range parsed.Messages {
-		if message.Role != "" && message.Role != "user" {
-			return nil, fmt.Errorf("messages[%d].role must be user", index)
+		switch message.Role {
+		case "", "user":
+			users++
+		case "developer":
+		default:
+			return nil, fmt.Errorf("messages[%d].role must be user or developer", index)
 		}
 		if message.MessageID != nil && strings.TrimSpace(*message.MessageID) == "" {
 			return nil, fmt.Errorf("messages[%d].message_id must not be empty", index)
@@ -642,6 +651,9 @@ func validateRequest(parsed Request) ([]RequestMessage, error) {
 				return nil, fmt.Errorf("messages[%d].message_id must be a UUID", index)
 			}
 		}
+	}
+	if users == 0 {
+		return nil, errors.New("messages must include a user message")
 	}
 	return parsed.Messages, nil
 }
