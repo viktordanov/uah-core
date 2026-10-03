@@ -26,6 +26,10 @@ func (item Item) Validate() error {
 		if _, ok := item.Data.(Reasoning); !ok {
 			return fmt.Errorf("reasoning data must be llm.Reasoning, got %T", item.Data)
 		}
+	case ItemConfigurationUpdate:
+		if _, ok := item.Data.(ConfigurationUpdate); !ok {
+			return fmt.Errorf("configuration update data must be llm.ConfigurationUpdate, got %T", item.Data)
+		}
 	default:
 		return fmt.Errorf("unsupported item type %q", item.Type)
 	}
@@ -84,6 +88,12 @@ func decodeItemData(kind ItemType, encoded jsontext.Value) (any, error) {
 		var value Reasoning
 		if err := json.Unmarshal(encoded, &value); err != nil {
 			return nil, fmt.Errorf("decode reasoning data: %w", err)
+		}
+		return value, nil
+	case ItemConfigurationUpdate:
+		var value ConfigurationUpdate
+		if err := json.Unmarshal(encoded, &value); err != nil {
+			return nil, fmt.Errorf("decode configuration update data: %w", err)
 		}
 		return value, nil
 	default:

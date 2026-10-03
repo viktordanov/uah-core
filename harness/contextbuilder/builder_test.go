@@ -46,6 +46,28 @@ func TestBuilderAddsExternalInputAsUserMessage(t *testing.T) {
 	}
 }
 
+func TestBuilderAddsConfigurationUpdateKeepingRequestEffort(t *testing.T) {
+	current := NewBuilder()
+	current.SetModel(llm.Model{ID: "model", ReasoningEffort: llm.ReasoningEffortHigh})
+	current.AddConfigurationUpdate(llm.ReasoningEffortLow)
+	current.Commit()
+
+	result, err := current.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := withPreamble(llm.Item{
+		Type: llm.ItemConfigurationUpdate,
+		Data: llm.ConfigurationUpdate{ReasoningEffort: llm.ReasoningEffortLow},
+	})
+	if !reflect.DeepEqual(result.Request.Input, want) {
+		t.Fatalf("input = %#v, want %#v", result.Request.Input, want)
+	}
+	if result.Request.Model.ReasoningEffort != llm.ReasoningEffortHigh || result.Request.Effort() != llm.ReasoningEffortLow {
+		t.Fatalf("efforts = %q, %q, want high for the request and low for the model", result.Request.Model.ReasoningEffort, result.Request.Effort())
+	}
+}
+
 func TestBuilderAddsDeveloperInputAsDeveloperMessage(t *testing.T) {
 	current := NewBuilder()
 	if err := current.AddExternalInput(inbox.Input{

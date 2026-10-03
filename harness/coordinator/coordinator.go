@@ -27,6 +27,12 @@ type Dependencies struct {
 	// Wake tunes when finished tool calls wake the model. Its zero value
 	// keeps the default: after the grace period, each result wakes it.
 	Wake WakePolicy
+	// EffortUpdate, when set, gives the effort to set with a configuration
+	// update before a turn's request, from the request built for it; ""
+	// sets none. The turn records the effort, so the update stays in the
+	// history and the request keeps its own effort, and with it the
+	// provider's prompt cache.
+	EffortUpdate func(llm.Request) llm.ReasoningEffort
 }
 
 // WakePolicy holds a turn's results back so that the model is not woken

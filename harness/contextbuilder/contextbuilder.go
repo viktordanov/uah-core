@@ -41,6 +41,9 @@ type Builder interface {
 	AddReasoning(llm.Reasoning)
 	AddTool(llm.Tool)
 	AddToolResult(string, []llm.ToolResultOutput, bool)
+	// AddConfigurationUpdate adds a configuration update that sets the
+	// effort from here on, leaving the request's effort as it is.
+	AddConfigurationUpdate(llm.ReasoningEffort)
 	Commit()
 	Build() (Result, error)
 }

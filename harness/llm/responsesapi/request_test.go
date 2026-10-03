@@ -203,6 +203,16 @@ func TestRequestBodyRejectsInvalidItemPayloads(t *testing.T) {
 			item: llm.Item{Type: llm.ItemReasoning, Data: llm.Reasoning{Summary: []string{"thought"}}},
 			want: "input item 0: reasoning item must carry the provider item in Raw",
 		},
+		{
+			name: "configuration update",
+			item: llm.Item{Type: llm.ItemConfigurationUpdate},
+			want: "input item 0: configuration update item data must be llm.ConfigurationUpdate, got <nil>",
+		},
+		{
+			name: "configuration update effort",
+			item: llm.Item{Type: llm.ItemConfigurationUpdate, Data: llm.ConfigurationUpdate{ReasoningEffort: "ultra"}},
+			want: `input item 0: configuration update has unsupported reasoning effort "ultra"`,
+		},
 	}
 
 	for _, test := range tests {
@@ -277,6 +287,44 @@ func TestRequestBodyEncodesDeveloperMessage(t *testing.T) {
 	}{{Role: "developer", Content: "context"}, {Role: "user", Content: "hello"}}
 	if !reflect.DeepEqual(got.Input, want) {
 		t.Fatalf("input = %+v, want %+v", got.Input, want)
+	}
+}
+
+func TestRequestBodyEncodesConfigurationUpdate(t *testing.T) {
+	user := llm.Item{Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleUser, Text: "hello"}}
+	request := llm.Request{
+		Model: llm.Model{ID: "gpt-test", ReasoningEffort: llm.ReasoningEffortHigh},
+		Input: []llm.Item{user, {Type: llm.ItemConfigurationUpdate, Data: llm.ConfigurationUpdate{ReasoningEffort: llm.ReasoningEffortLow}}},
+	}
+	body, err := requestBody(request, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Input     []jsontext.Value `json:"input"`
+		Reasoning struct {
+			Effort string `json:"effort"`
+		} `json:"reasoning"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Input) != 2 || string(got.Input[1]) != `{"type":"configuration_update","reasoning":{"effort":"low"}}` {
+		t.Fatalf("input = %s", body)
+	}
+	if got.Reasoning.Effort != "high" {
+		t.Fatalf("reasoning effort = %q, want the request's", got.Reasoning.Effort)
+	}
+
+	var cache inputCache
+	for range 2 {
+		encoded, err := cache.encode(request.Input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(encoded[1]) != string(got.Input[1]) {
+			t.Fatalf("cached encoding = %s", encoded[1])
+		}
 	}
 }
 

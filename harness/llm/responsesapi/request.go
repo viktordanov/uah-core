@@ -250,12 +250,18 @@ func sameItem(item, other llm.Item) bool {
 	case llm.Reasoning:
 		otherData, ok := other.Data.(llm.Reasoning)
 		return ok && slices.Equal(data.Summary, otherData.Summary) && bytes.Equal(data.Raw, otherData.Raw)
+	case llm.ConfigurationUpdate:
+		otherData, ok := other.Data.(llm.ConfigurationUpdate)
+		return ok && data == otherData
 	default:
 		return false
 	}
 }
 
 func requestInputItem(source llm.Item, custom map[string]bool) (jsontext.Value, error) {
+	if source.Type == llm.ItemConfigurationUpdate {
+		return configurationUpdateItem(source)
+	}
 	if source.Type == llm.ItemMessage && source.ProviderID == "" {
 		message, ok := source.Data.(llm.Message)
 		if !ok {
@@ -281,6 +287,26 @@ func requestInputItem(source llm.Item, custom map[string]bool) (jsontext.Value, 
 		return nil, err
 	}
 	return converted.MarshalJSON()
+}
+
+// configurationUpdateItem encodes an update as Codex sends it, which the
+// generated API types do not describe:
+// {"type":"configuration_update","reasoning":{"effort":"low"}}.
+func configurationUpdateItem(source llm.Item) (jsontext.Value, error) {
+	update, ok := source.Data.(llm.ConfigurationUpdate)
+	if !ok {
+		return nil, fmt.Errorf("configuration update item data must be llm.ConfigurationUpdate, got %T", source.Data)
+	}
+	if !update.ReasoningEffort.Valid() {
+		return nil, fmt.Errorf("configuration update has unsupported reasoning effort %q", update.ReasoningEffort)
+	}
+	type reasoning struct {
+		Effort llm.ReasoningEffort `json:"effort"`
+	}
+	return json.Marshal(struct {
+		Type      string    `json:"type"`
+		Reasoning reasoning `json:"reasoning"`
+	}{Type: string(llm.ItemConfigurationUpdate), Reasoning: reasoning{Effort: update.ReasoningEffort}})
 }
 
 func requestItem(source llm.Item, custom map[string]bool) (openaiapi.Item, error) {

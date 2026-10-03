@@ -20,6 +20,14 @@ asynchronous and durable:
   resumed, and forked like a user message and goes to the model as a
   `developer` role message, but it does not request a model response: it goes
   with the next request.
+- **Effort updates.** `coordinator.Dependencies.EffortUpdate` can set a
+  turn's reasoning effort with a Codex-style `configuration_update` input
+  item (`llm.ItemConfigurationUpdate`) instead of the request's effort, so
+  the request keeps its effort and the provider's prompt cache. The turn
+  records the effort, so the update is resumed and forked with the history.
+  `llm.Request.WithoutConfigurationUpdates` gives the request for a model
+  that does not take the item, and `llm.Request.Effort` the effort the
+  model reasons at.
 - **Wake policy.** `coordinator.WakePolicy` can hold a turn's results so the
   model wakes once with all of them, and opens a valve with the output so far
   of a call that runs past the hold.

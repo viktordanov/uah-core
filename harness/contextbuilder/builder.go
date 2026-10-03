@@ -129,6 +129,13 @@ func (current *builder) AddToolResult(
 	})
 }
 
+func (current *builder) AddConfigurationUpdate(effort llm.ReasoningEffort) {
+	current.stagedSuffix = append(current.stagedSuffix, llm.Item{
+		Type: llm.ItemConfigurationUpdate,
+		Data: llm.ConfigurationUpdate{ReasoningEffort: effort},
+	})
+}
+
 func (current *builder) Commit() {
 	current.committedPrefix = append(current.committedPrefix, current.stagedSuffix...)
 	current.stagedSuffix = nil
