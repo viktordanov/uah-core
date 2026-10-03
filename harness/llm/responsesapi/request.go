@@ -62,6 +62,13 @@ func encodeRequestBody(
 			Summary: &summary,
 		}
 	}
+	if request.Model.Verbosity != "" {
+		if !request.Model.Verbosity.Valid() {
+			return nil, fmt.Errorf("unsupported verbosity %q", request.Model.Verbosity)
+		}
+		verbosity := openaiapi.Verbosity(request.Model.Verbosity)
+		params.Text = &openaiapi.ResponseTextParam{Verbosity: &verbosity}
+	}
 	if len(tools) != 0 {
 		params.Tools = &tools
 	}
