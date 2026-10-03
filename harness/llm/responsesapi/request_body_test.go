@@ -76,7 +76,7 @@ func TestRequestBodyMatchesLegacyEncoding(t *testing.T) {
 		{
 			name: "history with options",
 			request: llm.Request{
-				Model: llm.Model{ID: "gpt-test", ReasoningEffort: llm.ReasoningEffortHigh, MaxOutputTokens: &maxOutputTokens},
+				Model: llm.Model{ID: "gpt-test", ReasoningEffort: llm.ReasoningEffortHigh, MaxOutputTokens: &maxOutputTokens, Verbosity: llm.VerbosityLow},
 				Input: history,
 				Tools: tools,
 			},
@@ -84,7 +84,7 @@ func TestRequestBodyMatchesLegacyEncoding(t *testing.T) {
 		},
 		{
 			name:           "history with extensions",
-			request:        llm.Request{Model: llm.Model{ID: "gpt-test"}, Input: history, Tools: tools},
+			request:        llm.Request{Model: llm.Model{ID: "gpt-test", Verbosity: llm.VerbosityHigh}, Input: history, Tools: tools},
 			promptCacheKey: "cache-key",
 			extensions:     extensions,
 		},
@@ -337,6 +337,13 @@ func legacyRequestBody(request llm.Request, promptCacheKey string, extensions ma
 			Effort:  &effort,
 			Summary: &summary,
 		}
+	}
+	if request.Model.Verbosity != "" {
+		if !request.Model.Verbosity.Valid() {
+			return nil, fmt.Errorf("unsupported verbosity %q", request.Model.Verbosity)
+		}
+		verbosity := openaiapi.Verbosity(request.Model.Verbosity)
+		params.Text = &openaiapi.ResponseTextParam{Verbosity: &verbosity}
 	}
 	if len(tools) != 0 {
 		params.Tools = &tools

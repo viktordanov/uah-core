@@ -95,6 +95,9 @@ type Model struct {
 	ID              string
 	MaxOutputTokens *int64
 	ReasoningEffort ReasoningEffort
+	// Verbosity is the Responses API's text.verbosity. Empty leaves it to the
+	// provider.
+	Verbosity Verbosity
 }
 
 type ReasoningEffort string
@@ -110,6 +113,23 @@ const (
 func (effort ReasoningEffort) Valid() bool {
 	switch effort {
 	case ReasoningEffortLow, ReasoningEffortMedium, ReasoningEffortHigh, ReasoningEffortXHigh, ReasoningEffortMax:
+		return true
+	default:
+		return false
+	}
+}
+
+type Verbosity string
+
+const (
+	VerbosityLow    Verbosity = "low"
+	VerbosityMedium Verbosity = "medium"
+	VerbosityHigh   Verbosity = "high"
+)
+
+func (verbosity Verbosity) Valid() bool {
+	switch verbosity {
+	case VerbosityLow, VerbosityMedium, VerbosityHigh:
 		return true
 	default:
 		return false

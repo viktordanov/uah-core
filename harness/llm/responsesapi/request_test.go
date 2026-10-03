@@ -328,6 +328,47 @@ func TestRequestBodyRejectsUnsupportedReasoningEffort(t *testing.T) {
 	}
 }
 
+func TestRequestBodyEncodesVerbosity(t *testing.T) {
+	body, err := requestBody(llm.Request{
+		Model: llm.Model{ID: "gpt-test", Verbosity: llm.VerbosityLow},
+	}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request struct {
+		Text map[string]any `json:"text"`
+	}
+	if err := json.Unmarshal(body, &request); err != nil {
+		t.Fatal(err)
+	}
+	if len(request.Text) != 1 || request.Text["verbosity"] != "low" {
+		t.Fatalf("text = %#v", request.Text)
+	}
+}
+
+func TestRequestBodyOmitsTextWithoutVerbosity(t *testing.T) {
+	body, err := requestBody(llm.Request{Model: llm.Model{ID: "gpt-test"}}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request map[string]any
+	if err := json.Unmarshal(body, &request); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := request["text"]; exists {
+		t.Fatalf("request = %#v", request)
+	}
+}
+
+func TestRequestBodyRejectsUnsupportedVerbosity(t *testing.T) {
+	_, err := requestBody(llm.Request{
+		Model: llm.Model{ID: "gpt-test", Verbosity: "terse"},
+	}, "", nil)
+	if err == nil || err.Error() != `unsupported verbosity "terse"` {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestRequestBodyEncodesHostedWebSearch(t *testing.T) {
 	body, err := requestBody(llm.Request{
 		Model: llm.Model{ID: "gpt-test"},
