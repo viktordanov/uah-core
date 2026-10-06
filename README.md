@@ -40,13 +40,13 @@ The repository has:
 
 ## Origins
 
-uah-core began as a fork of
-[unreallabsai/unreal-agent](https://github.com/unreallabsai/unreal-agent)
-v0.2.0 (MIT, Copyright (c) 2026 Unreal Labs), first published as
-[viktordanov/unreal-agent](https://github.com/viktordanov/unreal-agent). It
-keeps that project's architecture and license. The changes since then are
-request encoding and resume performance, custom tools with free-form input, and
-the wake policy.
+uah-core started from
+[unreal-agent](https://github.com/unreallabsai/unreal-agent) v0.2.0 (MIT,
+Copyright (c) 2026 Unreal Labs), whose license and notice it keeps, and has
+gone its own way since: request encoding and resume performance, custom tools
+with free-form input, developer-role inputs, text verbosity, effort changes
+that keep the prompt cache, and the wake policy. It is developed on its own
+and does not follow unreal-agent.
 
 ## Glossary
 
