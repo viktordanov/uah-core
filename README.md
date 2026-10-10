@@ -28,6 +28,10 @@ asynchronous and durable:
   `llm.Request.WithoutConfigurationUpdates` gives the request for a model
   that does not take the item, and `llm.Request.Effort` the effort the
   model reasons at.
+- **Continuing when idle.** `coordinator.Dependencies.Continue` is asked
+  for more input when a run with a stop-when-idle control goes idle, before
+  it stops. The inputs it returns are recorded and handled as inbox inputs,
+  and the run goes on; none lets it stop. A hard stop never asks.
 - **Wake policy.** `coordinator.WakePolicy` can hold a turn's results so the
   model wakes once with all of them, and opens a valve with the output so far
   of a call that runs past the hold.
