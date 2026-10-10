@@ -134,7 +134,14 @@ func (current *coordinator) Run(ctx context.Context) error {
 			current.clearToolGrace()
 		}
 		if current.stop.request.Mode == inbox.StopWhenIdle && current.isIdle() {
-			return ctx.Err()
+			more, err := current.continueIdle(ctx)
+			if err != nil {
+				return err
+			}
+			if !more {
+				return ctx.Err()
+			}
+			continue
 		}
 
 		if !current.isWaitingForOnlyToolCalls() {
@@ -357,6 +364,28 @@ func (current *coordinator) handleStop() (bool, error) {
 		current.stop.cancellationRequested = true
 	}
 	return !current.hasPendingOperations(), nil
+}
+
+// continueIdle asks Continue for more input once the session is idle with
+// a stop-when-idle control, handles what it returns, and reports whether
+// there was any.
+func (current *coordinator) continueIdle(ctx context.Context) (bool, error) {
+	if current.dependencies.Continue == nil {
+		return false, nil
+	}
+	inputs := current.dependencies.Continue(ctx)
+	if err := ctx.Err(); err != nil || len(inputs) == 0 {
+		return false, err
+	}
+	for _, input := range inputs {
+		if err := input.Validate(); err != nil {
+			return false, fmt.Errorf("continue input: %w", err)
+		}
+	}
+	if err := current.processInputs(ctx, inputs); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (current *coordinator) isIdle() bool {

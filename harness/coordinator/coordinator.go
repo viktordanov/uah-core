@@ -33,6 +33,12 @@ type Dependencies struct {
 	// history and the request keeps its own effort, and with it the
 	// provider's prompt cache.
 	EffortUpdate func(llm.Request) llm.ReasoningEffort
+	// Continue, when set, is asked for more input when the session goes
+	// idle with a stop-when-idle control, before Run stops: the inputs it
+	// returns are handled as inbox inputs and the loop goes on; none lets
+	// Run stop. It runs on the loop's goroutine and should return once ctx
+	// is done.
+	Continue func(context.Context) []inbox.Input
 }
 
 // WakePolicy holds a turn's results back so that the model is not woken
