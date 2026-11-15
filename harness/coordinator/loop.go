@@ -51,10 +51,19 @@ type loopState struct {
 	callModel         bool
 	grace             <-chan time.Time
 	graceToolCalls    map[toolCallKey]struct{}
-	// valves are the WakePolicy's Hold deadlines of the running calls; valve
-	// fires at the earliest.
-	valves map[toolCallKey]time.Time
+	// valves are the running calls' hold deadlines; valve fires at the
+	// earliest.
+	valves map[toolCallKey]callValve
 	valve  <-chan time.Time
+}
+
+// callValve is a running call's hold: its deadline, how long it held, and
+// whether the call has a hold of its own (WakePolicy.CallHold), which keeps
+// its heartbeats quiet until the deadline.
+type callValve struct {
+	deadline time.Time
+	hold     time.Duration
+	own      bool
 }
 
 type toolCallState struct {
@@ -85,7 +94,7 @@ func newLoopState() loopState {
 		toolCalls:      make(map[toolCallKey]toolCallState),
 		operations:     make(map[operation.ID]operation.Operation),
 		graceToolCalls: make(map[toolCallKey]struct{}),
-		valves:         make(map[toolCallKey]time.Time),
+		valves:         make(map[toolCallKey]callValve),
 	}
 }
 
@@ -261,8 +270,9 @@ func (current *coordinator) processModelResponse(ctx context.Context, modelRespo
 }
 
 // holdTurn holds the turn's results until every call it issued and that
-// still runs has finished, and gives each such call its Hold deadline. It
-// reports false when no call runs, which leaves the default.
+// still runs has finished, and gives each such call its deadline: Hold, or
+// the call's own (CallHold). It reports false when no call runs, which
+// leaves the default.
 func (current *coordinator) holdTurn(statuses []sessionstore.ToolCallStatus) bool {
 	policy := current.dependencies.Wake
 	now := time.Now()
@@ -272,7 +282,8 @@ func (current *coordinator) holdTurn(statuses []sessionstore.ToolCallStatus) boo
 			continue
 		}
 		current.state.graceToolCalls[key] = struct{}{}
-		current.state.valves[key] = now.Add(policy.callHold(current.state.toolCalls[key].toolCall))
+		hold, own := policy.callHold(current.state.toolCalls[key].toolCall)
+		current.state.valves[key] = callValve{deadline: now.Add(hold), hold: hold, own: own}
 	}
 	current.armValve()
 	if len(current.state.graceToolCalls) == 0 {
@@ -282,8 +293,8 @@ func (current *coordinator) holdTurn(statuses []sessionstore.ToolCallStatus) boo
 	return true
 }
 
-// openValves wakes the model for each call still running past its Hold
-// deadline, with its output so far, and stops holding the turn for it.
+// openValves wakes the model for each call still running past its
+// deadline, with its output so far, and stops holding the turn back.
 func (current *coordinator) openValves() {
 	now := time.Now()
 	opened := false
@@ -291,33 +302,34 @@ func (current *coordinator) openValves() {
 		return cmp.Compare(a.callID, b.callID)
 	})
 	for _, key := range keys {
-		if current.state.valves[key].After(now) {
+		v := current.state.valves[key]
+		if v.deadline.After(now) {
 			continue
 		}
 		delete(current.state.valves, key)
 		if _, running := current.state.toolCalls[key]; !running {
 			continue
 		}
-		current.addToolProgress(key, current.dependencies.Wake.callHold(current.state.toolCalls[key].toolCall))
+		current.addToolProgress(key, v.hold)
 		current.state.availableInputs++
 		delete(current.state.graceToolCalls, key)
 		opened = true
 	}
 	if opened {
-		// A call reaching its deadline wakes the model even when a
-		// deliberate wait from the same turn has a later deadline.
+		// A call past its deadline wakes the model also while a call of
+		// the same turn with a later one of its own still runs.
 		current.clearToolGrace()
 	}
 	current.armValve()
 }
 
-// armValve sets the valve timer to the earliest Hold deadline.
+// armValve sets the valve timer to the earliest deadline.
 func (current *coordinator) armValve() {
 	current.state.valve = nil
 	var earliest time.Time
-	for _, deadline := range current.state.valves {
-		if earliest.IsZero() || deadline.Before(earliest) {
-			earliest = deadline
+	for _, v := range current.state.valves {
+		if earliest.IsZero() || v.deadline.Before(earliest) {
+			earliest = v.deadline
 		}
 	}
 	if !earliest.IsZero() {
@@ -426,14 +438,13 @@ func (current *coordinator) postHeartbeat(ctx context.Context) error {
 	})
 }
 
-// heartbeatCalls leaves deliberately blocking calls quiet while their
-// hold is active. Other calls retain their normal heartbeat.
+// heartbeatCalls are the running calls a heartbeat names: all but those
+// still within a hold of their own.
 func (current *coordinator) heartbeatCalls() []llm.ToolCall {
 	calls := make([]llm.ToolCall, 0, len(current.state.toolCalls))
 	now := time.Now()
 	for key, call := range current.state.toolCalls {
-		if quiet := current.dependencies.Wake.QuietHold; quiet != nil &&
-			current.state.valves[key].After(now) && quiet(call.toolCall) > 0 {
+		if v, held := current.state.valves[key]; held && v.own && v.deadline.After(now) {
 			continue
 		}
 		calls = append(calls, call.toolCall)

@@ -44,7 +44,8 @@ asynchronous and durable:
   and the run goes on; none lets it stop. A hard stop never asks.
 - **Wake policy.** `coordinator.WakePolicy` can hold a turn's results so the
   model wakes once with all of them, and opens a valve with the output so far
-  of a call that runs past the hold.
+  of a call that runs past the hold. `CallHold` gives a call a hold of its own, such as a
+  wait that blocks until a job ends, with no heartbeats until it passes.
 
 The repository has:
 

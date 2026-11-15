@@ -10,9 +10,9 @@ import (
 	"github.com/viktordanov/uah-core/harness/operation"
 )
 
-func quietPolicy() WakePolicy {
+func callHoldPolicy() WakePolicy {
 	p := holdPolicy(5 * time.Minute)
-	p.QuietHold = func(call llm.ToolCall) time.Duration {
+	p.CallHold = func(call llm.ToolCall) time.Duration {
 		if call.CallID == "quiet" {
 			return time.Hour
 		}
@@ -21,9 +21,9 @@ func quietPolicy() WakePolicy {
 	return p
 }
 
-func TestQuietHoldSuppressesValveAndHeartbeatsUntilCompletion(t *testing.T) {
+func TestCallHoldSuppressesValveAndHeartbeatsUntilCompletion(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, quietPolicy())
+		run := newWakeTestRun(t, callHoldPolicy())
 		run.current.dependencies.ToolHeartbeatInterval = 10 * time.Minute
 		run.respond(t, 0, toolGraceResponse("quiet"))
 		synctest.Sleep(59 * time.Minute)
@@ -38,9 +38,9 @@ func TestQuietHoldSuppressesValveAndHeartbeatsUntilCompletion(t *testing.T) {
 	})
 }
 
-func TestQuietHoldDeadlineStillWakes(t *testing.T) {
+func TestCallHoldDeadlineStillWakes(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, quietPolicy())
+		run := newWakeTestRun(t, callHoldPolicy())
 		run.respond(t, 0, toolGraceResponse("quiet"))
 		synctest.Sleep(time.Hour + 10*slurpIdleTimeout)
 		if run.requestCount() != 2 {
@@ -50,9 +50,9 @@ func TestQuietHoldDeadlineStillWakes(t *testing.T) {
 	})
 }
 
-func TestQuietHoldAllowsUserInput(t *testing.T) {
+func TestCallHoldAllowsUserInput(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, quietPolicy())
+		run := newWakeTestRun(t, callHoldPolicy())
 		run.respond(t, 0, toolGraceResponse("quiet"))
 		synctest.Sleep(time.Minute)
 		run.input(t, externalEvent(t, 1, "steer", "check the job"))
@@ -62,9 +62,9 @@ func TestQuietHoldAllowsUserInput(t *testing.T) {
 	})
 }
 
-func TestQuietHoldDoesNotSuppressOtherCalls(t *testing.T) {
+func TestCallHoldDoesNotSuppressOtherCalls(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, quietPolicy())
+		run := newWakeTestRun(t, callHoldPolicy())
 		run.current.dependencies.ToolHeartbeatInterval = time.Minute
 		run.respond(t, 0, toolGraceResponse("quiet", "ordinary"))
 		synctest.Sleep(time.Minute + 10*slurpIdleTimeout)
@@ -78,9 +78,9 @@ func TestQuietHoldDoesNotSuppressOtherCalls(t *testing.T) {
 	})
 }
 
-func TestQuietHoldDoesNotChangeOrdinaryValve(t *testing.T) {
+func TestCallHoldDoesNotChangeOrdinaryValve(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, quietPolicy())
+		run := newWakeTestRun(t, callHoldPolicy())
 		run.respond(t, 0, toolGraceResponse("quiet", "ordinary"))
 		synctest.Sleep(5*time.Minute + 10*slurpIdleTimeout)
 		if run.requestCount() != 2 {
@@ -90,9 +90,9 @@ func TestQuietHoldDoesNotChangeOrdinaryValve(t *testing.T) {
 	})
 }
 
-func TestQuietHoldAllowsHardStop(t *testing.T) {
+func TestCallHoldAllowsHardStop(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		run := newWakeTestRun(t, quietPolicy())
+		run := newWakeTestRun(t, callHoldPolicy())
 		run.respond(t, 0, toolGraceResponse("quiet"))
 		run.input(t, stopInput(t, "stop", inbox.StopHard))
 		if len(run.operations.cancels) != 1 {
@@ -102,6 +102,26 @@ func TestQuietHoldAllowsHardStop(t *testing.T) {
 		run.assertStopped(t)
 		if run.requestCount() != 1 {
 			t.Fatal("cancellation woke the model")
+		}
+	})
+}
+
+func TestCallHoldIsAskedOncePerCall(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		policy := callHoldPolicy()
+		asked := 0
+		own := policy.CallHold
+		policy.CallHold = func(call llm.ToolCall) time.Duration {
+			asked++
+
+			return own(call)
+		}
+		run := newWakeTestRun(t, policy)
+		run.current.dependencies.ToolHeartbeatInterval = time.Minute
+		run.respond(t, 0, toolGraceResponse("quiet"))
+		synctest.Sleep(30 * time.Minute)
+		if asked != 1 {
+			t.Fatalf("CallHold was asked %d times, want once", asked)
 		}
 	})
 }
